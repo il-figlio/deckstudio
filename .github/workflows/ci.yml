@@ -32,6 +32,9 @@ jobs:
       - run: npm ci
       - run: npm ci
         working-directory: editor
+      # shell actions and status commands run under /bin/zsh, as on macOS; Ubuntu runners don't ship it
+      - name: Install zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh && test -x /bin/zsh
       - name: Unit tests
         run: npm test
       - name: Editor typecheck
