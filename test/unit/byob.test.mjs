@@ -311,14 +311,14 @@ for (const a of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.1.1', '169.254.
 }
 
 // ---------- 7. decoded images are cached ----------
+// Checked by identity, not timing: a timing comparison was flaky on shared CI runners (cold 2.1 ms vs warm 2.7 ms).
 {
   const c = createCanvas(400, 400), x = c.getContext('2d'); for (let i = 0; i < 400; i += 4) { x.fillStyle = `hsl(${i},80%,50%)`; x.fillRect(i, 0, 4, 400) }
   const src = c.toDataURL('image/jpeg')
-  const t = async () => { const t0 = performance.now(); await R.renderKeySpec({ image: src }); return performance.now() - t0 }
-  await t()
-  const firstOther = await (async () => { const c2 = createCanvas(400, 400); c2.getContext('2d').fillRect(0, 0, 9, 9); const s2 = c2.toDataURL('image/jpeg'); const t0 = performance.now(); await R.renderKeySpec({ image: s2 }); return performance.now() - t0 })()
-  let warm = 0; for (let i = 0; i < 10; i++) warm += await t()
-  ok(warm / 10 < firstOther, '7 repeated data-URL image renders reuse the decoded image', `cold ${firstOther.toFixed(1)} ms vs warm ${(warm / 10).toFixed(1)} ms`)
+  const img = await R.getImage(src)
+  await R.renderKeySpec({ image: src }); await R.renderKeySpec({ image: src })
+  ok(img && (await R.getImage(src)) === img, '7 repeated data-URL image renders reuse the decoded image', img ? `${img.width}x${img.height}, decoded once` : 'decode failed')
+  ok((await R.getImage('/etc/hosts')) === null && (await R.getImage('https://example.com/a.png')) === null, '7b only inline data URLs are decoded (no files, no network)')
 }
 
 // leave nothing behind

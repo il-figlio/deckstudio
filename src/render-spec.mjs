@@ -254,7 +254,7 @@ function withMotion(ctx, motion, t, cx, cy, draw) {
 }
 export const SPRITE_COLORS = { red: '#e5484d', orange: '#f76b15', yellow: '#e2a336', green: '#30a46c', cyan: '#05a2c2', blue: '#0090ff', violet: '#6e56cf', magenta: '#d6409f', brown: '#a07553', gray: '#6f6e77', black: '#1b1b19', white: '#f4f4f0' }
 
-async function getImage(src, t = 0) {
+export async function getImage(src, t = 0) { // exported for the cache test
   if (typeof src === 'string' && src.startsWith('data:image/gif')) {
     const g = gifFrames(src)
     if (g) { const at = (t || 0) % g.total; return (g.frames.find(f => at < f.at + f.delay) || g.frames[0]).c }

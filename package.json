@@ -26,9 +26,6 @@
   "engines": {
     "node": ">=22"
   },
-  "os": [
-    "darwin"
-  ],
   "private": true,
   "main": "server.mjs",
   "type": "module",

@@ -88,6 +88,9 @@ const isUp = async () => { try { await fetch(BASE + '/api/state', { signal: Abor
 const [cmd, ...rest] = process.argv.slice(2)
 switch (cmd) {
   case 'start': {
+    // the server needs macOS (HID access, the Swift helper, capture). package.json carries no "os" field so the
+    // editor demo, tests and CI can install anywhere; refuse here instead.
+    if (process.platform !== 'darwin') die('DeckStudio runs on macOS only. The browser demo works anywhere: npm run build:demo:public')
     if (await isUp()) { console.log(`already running → ${BASE}`); break }
     fs.mkdirSync(HOME_DIR, { recursive: true, mode: 0o700 }); fs.chmodSync(HOME_DIR, 0o700)
     const log = fs.openSync(path.join(HOME_DIR, 'server.log'), 'a', 0o600); fs.fchmodSync(log, 0o600)
