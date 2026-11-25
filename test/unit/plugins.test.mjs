@@ -186,7 +186,8 @@ const host = new PluginHost({
 host.focus(['cmdy', 'httpy', 'filey', 'shelly', 'slowy', 'netty', 'redir', 'bigly', 'secret', 'cap', 'loco', 'linky', 'botty'])
 host.start()
 const P = id => host.summary().plugins.find(p => p.id === id && p.valid !== false) || host.summary().plugins.find(p => p.id === id)
-await until(() => P('cmdy')?.state === 'ok' && P('httpy')?.state === 'ok' && P('filey')?.state === 'ok' && P('loco')?.state === 'ok')
+// also wait for the http polls that end in an error (redirect, 2 MB body): on a slow runner the body is still downloading
+await until(() => P('cmdy')?.state === 'ok' && P('httpy')?.state === 'ok' && P('filey')?.state === 'ok' && P('loco')?.state === 'ok' && P('redir')?.state === 'error' && P('bigly')?.state === 'error')
 
 {
   const sum = host.summary().plugins
