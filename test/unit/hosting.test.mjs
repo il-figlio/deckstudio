@@ -34,3 +34,18 @@ test('the e2e host merges every matching _headers block', () => {
   assert.deepEqual(headersFor(rules, '/x.wasm'), { 'Content-Type': 'application/wasm', 'X-Frame-Options': 'DENY' })
   assert.deepEqual(headersFor(rules, '/'), { 'X-Frame-Options': 'DENY' })
 })
+
+// Vercel Git builds read the repo-root vercel.json (web/site/vercel.json only applies to `vercel deploy web/site`).
+test('root vercel.json builds the public demo and matches editor/hosting/vercel.json', () => {
+  const root = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'))
+  const site = JSON.parse(fs.readFileSync(path.join(H, 'vercel.json'), 'utf8'))
+  assert.equal(root.buildCommand, 'npm run build:demo:public')
+  assert.equal(root.outputDirectory, 'web/site')
+  for (const k of ['cleanUrls', 'rewrites', 'headers']) assert.deepEqual(root[k], site[k], `vercel.json ${k}`)
+})
+
+test('.vercelignore skips everything .gitignore does', () => {
+  const lines = f => fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'))
+  const vi = new Set(lines('.vercelignore'))
+  for (const l of lines('.gitignore')) assert.ok(vi.has(l), `.vercelignore lacks ${l}`)
+})

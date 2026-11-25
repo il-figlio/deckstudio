@@ -16,7 +16,14 @@ const svgNames = (d: string) => { try { return fs.readdirSync(d).filter((f) => f
 // DECK_PUBLIC=1 (npm run build:demo:public): only assets committed to git ship. Local, gitignored art
 // (your own app icons, Icon Studio saves) stays out of a site you publish.
 const PUBLIC = process.env.DECK_PUBLIC === '1'
-const TRACKED = (() => { try { return new Set(execFileSync('git', ['ls-files', 'assets'], { cwd: ROOT }).toString().split('\n').filter(Boolean).map((f) => path.basename(f).replace(/\.(png|svg)$/, ''))) } catch { return null } })()
+const walk = (d: string): string[] => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [e.name]))
+const TRACKED = (() => {
+  try { return new Set(execFileSync('git', ['ls-files', 'assets'], { cwd: ROOT }).toString().split('\n').filter(Boolean).map((f) => path.basename(f).replace(/\.(png|svg)$/, ''))) } catch {}
+  // Vercel's Git builds check out the repo without .git. That checkout holds only committed files, so every asset
+  // in it is tracked. Only trusted when Vercel says so (VERCEL=1, VERCEL_GIT_COMMIT_SHA set), never on a dev Mac.
+  if (process.env.VERCEL === '1' && process.env.VERCEL_GIT_COMMIT_SHA) try { return new Set(walk(path.join(ROOT, 'assets')).filter((f) => !/^(custom-|app-ante-)/.test(f)).map((f) => f.replace(/\.(png|svg)$/, ''))) } catch {} // + the .gitignore personal patterns, in case of a CLI upload
+  return null
+})()
 // A public build must know what's tracked: without git it would ship every local file, so it stops instead.
 if (PUBLIC && !TRACKED?.size) throw new Error('DECK_PUBLIC=1: `git ls-files assets` failed or listed nothing, so the build can\'t tell shipped assets from local ones. Build from a git checkout.')
 const local = (name: string) => PUBLIC && !TRACKED!.has(name.replace(/\.(png|svg)$/, ''))

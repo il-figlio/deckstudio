@@ -1,0 +1,32 @@
+# Vercel uploads (vercel deploy from the repo root) skip the same files git does: personal setup never leaves this Mac.
+# Keep in sync with .gitignore (test/unit/hosting.test.mjs checks).
+node_modules/
+web/dist/
+web/site/
+editor/dist/
+bin/deckhelper
+.DS_Store
+*.log
+# personal, stays on this Mac: profile/token/logs live in ~/.deckstudio (outside the repo);
+# icons saved from Icon Studio and agent handoff briefs are local too
+assets/logos/custom-*
+# app icons: DeckStudio writes the ones it pulls from installed apps to ~/.deckstudio/logos, but in case one lands
+# here, only the shipped icons below are tracked. Adding a new shipped icon: add a `!` line for it.
+assets/logos/app-*
+!assets/logos/app-chatgpt.png
+!assets/logos/app-claude.png
+!assets/logos/app-codex-dark.png
+!assets/logos/app-codex-space.png
+!assets/logos/app-codex.png
+!assets/logos/app-grokbot.png
+!assets/logos/app-hex.png
+!assets/logos/app-rex.png
+docs/handoffs/
+.env*
+# Ante pages/recipes and unreleased Ante app icons: this Mac only (see src/local-profile.example.mjs)
+src/local-profile.mjs
+assets/logos/app-ante-*
+assets/glyphs/app-ante-*
+# this Mac's own plugins (internal tools): plugins/local/<id>/deckstudio.json, on by default, never committed
+plugins/local/
+.git/
