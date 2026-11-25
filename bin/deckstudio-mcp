@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+// deckstudio-mcp — MCP server (stdio) for DeckStudio. Setup: docs/MCP.md
+import { main } from '../src/mcp.mjs'
+main().catch(e => { console.error('deckstudio-mcp:', e?.message || e); process.exit(1) })

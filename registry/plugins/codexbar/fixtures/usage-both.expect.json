@@ -1,0 +1,9 @@
+{
+  "note": "codexbar usage --provider both --format json --status: a JSON array, codex first, then claude (ProviderSelection.both = primary providers in ProviderManifest.allDescriptors order).",
+  "values": {
+    "codex_provider": "codex", "codex_session": "28", "codex_week": "59", "codex_hot": "", "codex_week_hot": "", "codex_reset": "2026-11-24T19:15:00Z", "codex_pace": "runs out",
+    "codex_incident": "", "codex_status": "Operational", "codex_credits": "112.4", "codex_error": "",
+    "claude_provider": "claude", "claude_session": "84", "claude_week": "37", "claude_hot": "on", "claude_week_hot": "", "claude_reset": "2026-11-24T20:00:00Z", "claude_week_reset": "2026-11-29T06:00:00Z",
+    "claude_pace": "runs out", "claude_incident": "minor", "claude_status": "Elevated errors on Claude Opus", "claude_cost": "12.5", "claude_cost_limit": "50", "claude_error": ""
+  }
+}

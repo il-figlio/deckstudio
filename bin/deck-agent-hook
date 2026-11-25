@@ -1,0 +1,105 @@
+#!/usr/bin/env node
+// deck-agent-hook: pushes an agent CLI's state into DeckStudio's agents page. No dependencies.
+//
+//   Claude Code hooks:  deck-agent-hook claude-code          (the hook payload arrives as JSON on stdin)
+//   Codex notify:       notify = ["/path/to/deck-agent-hook", "codex"]   (Codex appends the JSON payload as the last argument)
+//   any script:         deck-agent-hook status <provider> <session id> <idle|working|done|needs|error|gone> [message]
+//
+// It sends only the session id, the project folder's name, the event's short message and the app
+// you run the agent in (to bring it forward on press) — never prompts, transcripts or tool input.
+// It never blocks or fails the agent: it always exits 0 within ~2 s, silently (DECK_AGENT_HOOK_DEBUG=1 prints why).
+// Token: $DECKSTUDIO_TOKEN, else ${DECKSTUDIO_HOME:-~/.deckstudio}/token. Server: $DECKSTUDIO_URL, else http://127.0.0.1:${DECKSTUDIO_PORT:-7337}.
+import fs from 'node:fs'
+import path from 'node:path'
+import http from 'node:http'
+import crypto from 'node:crypto'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const debug = process.env.DECK_AGENT_HOOK_DEBUG === '1'
+const quit = (why) => { if (debug && why) process.stderr.write(`deck-agent-hook: ${why}\n`); process.exit(0) }
+setTimeout(() => quit('timed out'), 2000).unref()
+
+const [mode = 'claude-code', ...rest] = process.argv.slice(2)
+const HOME = process.env.DECKSTUDIO_HOME || path.join(process.env.HOME || '', '.deckstudio')
+const BASE = (() => { // loopback only, like the MCP server (src/mcp.mjs baseUrl): the token never leaves this Mac
+  const raw = process.env.DECKSTUDIO_URL || `http://127.0.0.1:${Number(process.env.DECKSTUDIO_PORT || 7337)}`
+  let u
+  try { u = new URL(raw) } catch { quit(`DECKSTUDIO_URL is not a URL: ${raw}`) }
+  if (u.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname)) quit(`DECKSTUDIO_URL must be http://127.0.0.1:<port> (loopback); got ${u.origin}`)
+  return u.origin
+})()
+let token = process.env.DECKSTUDIO_TOKEN || ''
+try { token ||= fs.readFileSync(path.join(HOME, 'token'), 'utf8').trim() } catch { quit('no token (is DeckStudio installed?)') }
+
+// The server must prove it knows the token (HMAC of our nonce) before we send it: a program squatting the port while
+// DeckStudio is down gets nothing. Same protocol as src/hello.mjs, copied so this script stays dependency-free.
+let verified = null
+async function verify() {
+  const nonce = crypto.randomBytes(16).toString('hex')
+  try {
+    const r = await fetch(`${BASE}/api/hello?nonce=${nonce}`, { redirect: 'error', signal: AbortSignal.timeout(800) })
+    const j = await r.json()
+    const want = crypto.createHmac('sha256', token).update(`deckstudio-hello/v1\n${nonce}\n${j.id}`).digest('hex')
+    return typeof j.proof === 'string' && j.proof.length === want.length && crypto.timingSafeEqual(Buffer.from(j.proof), Buffer.from(want))
+  } catch { return false }
+}
+async function post(route, body) {
+  if (!(verified ??= await verify())) return debug ? `${BASE} did not prove it is DeckStudio (not running, or another program on the port): token not sent` : ''
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body)
+    const u = new URL(route, BASE)
+    const req = http.request(u, { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data), 'x-deck-token': token, 'x-deck-client': 'deck-agent-hook' }, timeout: 1500 }, (res) => {
+      let out = ''
+      res.on('data', (d) => { out += d })
+      res.on('end', () => resolve(debug ? `${res.statusCode} ${out}` : ''))
+    })
+    req.on('error', (e) => resolve(debug ? e.message : ''))
+    req.on('timeout', () => { req.destroy(); resolve('timed out') })
+    req.end(data)
+  })
+}
+function readStdin() {
+  if (process.stdin.isTTY) return Promise.resolve('')
+  return new Promise((resolve) => {
+    let s = ''
+    process.stdin.setEncoding('utf8')
+    process.stdin.on('data', (d) => { s += d; if (s.length > 1 << 20) resolve(s) })
+    process.stdin.on('end', () => resolve(s))
+    process.stdin.on('error', () => resolve(s))
+  })
+}
+// only what the mapping reads: if the shared schema can't be loaded, the server maps these few fields instead
+const KEEP = ['session_id', 'hook_event_name', 'cwd', 'notification_type', 'message', 'tool_name', 'session_title', 'type', 'thread-id', 'thread_id', 'turn-id']
+const trim = (p) => Object.fromEntries(KEEP.filter((k) => p && typeof p[k] !== 'object' && p[k] != null).map((k) => [k, String(p[k]).slice(0, 300)]))
+const env = { __CFBundleIdentifier: process.env.__CFBundleIdentifier || '', TERM_PROGRAM: process.env.TERM_PROGRAM || '' }
+
+async function main() {
+  if (mode === 'status') {
+    const [provider, id, state, ...msg] = rest
+    if (!provider || !id || !state) quit('usage: deck-agent-hook status <provider> <id> <state> [message]')
+    return quit(await post('/api/agents/status', { provider, id, state, ...(msg.length ? { message: msg.join(' ') } : {}) }))
+  }
+  let payload
+  try {
+    const raw = mode === 'codex' ? rest[rest.length - 1] || '' : await readStdin()
+    payload = JSON.parse(raw)
+  } catch { return quit('no JSON payload') }
+  const source = mode === 'codex' ? 'codex' : 'claude-code'
+  let hookStatus = null
+  try {
+    // load the shared mapping only from a real DeckStudio checkout: the script may be a copy or a symlink, and
+    // whatever sits at ../src next to it must not get to run in every agent session. Else the server maps it.
+    const here = path.dirname(fs.realpathSync(fileURLToPath(import.meta.url)))
+    const root = path.join(here, '..')
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+    const schema = path.join(root, 'src/agent-schema.mjs')
+    const st = fs.lstatSync(schema)
+    if (pkg?.name === 'deckstudio' && st.isFile() && st.uid === process.getuid() && !(st.mode & 0o022))
+      ({ hookStatus } = await import(pathToFileURL(schema).href))
+  } catch {}
+  if (!hookStatus) return quit(await post('/api/agents/hook', { source, payload: trim(payload), env }))
+  const st = hookStatus(source, payload, env)
+  if (!st) return quit('event ignored')
+  quit(await post('/api/agents/status', st))
+}
+main().catch((e) => quit(e.message))

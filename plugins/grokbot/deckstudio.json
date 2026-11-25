@@ -1,0 +1,27 @@
+{
+  "$schema": "../../docs/plugin.schema.json",
+  "deckstudio": "plugin/v1",
+  "id": "grokbot",
+  "name": "Grok Bot",
+  "version": "1.0.0",
+  "author": "DeckStudio",
+  "description": "Grok Bot's local roster, read live by DeckStudio's bots provider \"grokbot\" (src/grokbots.mjs).",
+  "icon": { "logo": "app-grokbot" },
+  "builtin": "grokbot",
+  "detect": { "bundle": "com.anysphere.sand" },
+  "status": { "builtin": "grokbot", "interval": 2 },
+  "values": { "calling": "$.calling", "count": "$.count", "available": { "path": "$.available", "map": { "true": "yes", "false": "no" } } },
+  "actions": {
+    "open": { "title": "Open Grok Bot", "type": "app", "target": "bundle" }
+  },
+  "templates": {
+    "pages": {
+      "grokbots": { "title": "Grok bots page", "what": "Grok Bot's bots, calling-you first; appears while Grok Bot is in front.",
+        "template": { "name": "Grok Bots", "source": "bots", "providers": ["grokbot"], "apps": ["com.anysphere.sand"], "keys": [], "dials": [], "strip": { "mode": "segments" } } }
+    },
+    "keys": {
+      "app": { "title": "Grok Bot (calling count)", "what": "Opens Grok Bot; shows how many of its bots call you, lamp lit while any does.",
+        "template": { "logo": "app-grokbot", "label": "Grok Bot", "title": "{self.calling} calling", "led": "{self.calling}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" } } }
+    }
+  }
+}

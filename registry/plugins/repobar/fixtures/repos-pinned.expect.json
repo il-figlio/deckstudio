@@ -1,0 +1,10 @@
+{
+  "note": "repobar repos --scope pinned --sort repo --limit 6 --json: a JSON array of RepoOutput. It has no ciStatus today, so the r*_ci lamps stay dark (see README).",
+  "values": {
+    "count": "3",
+    "r1_owner": "example-org", "r1_repo": "api", "r1_prs": "3", "r1_issues": "14", "r1_ci": "",
+    "r2_owner": "example-org", "r2_repo": "web", "r2_prs": "0", "r2_issues": "0",
+    "r3_owner": "someone", "r3_repo": "tool", "r3_prs": "7", "r3_issues": "2",
+    "r4_owner": "", "r4_prs": ""
+  }
+}

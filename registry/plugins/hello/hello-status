@@ -1,0 +1,7 @@
+#!/bin/sh
+# Example status command for the "hello" DeckStudio plugin: print one JSON document and exit 0.
+# A real tool reports its own state here. updated_at lets DeckStudio tell a fresh status from a stale one.
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+minute=$(expr "$(date +%M)" + 0)
+if [ $((minute % 2)) -eq 0 ]; then busy=true; else busy=false; fi
+printf '{"state":"ok","greeting":"hello","minute":%d,"busy":%s,"updated_at":"%s"}\n' "$minute" "$busy" "$now"

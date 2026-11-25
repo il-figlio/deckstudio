@@ -1,0 +1,50 @@
+{
+  "app": {
+    "status": "running",
+    "enabled": true,
+    "type": "executable",
+    "process": {
+      "pid": 48213,
+      "hostname": "mac.local",
+      "isActive": true,
+      "lastHeartbeat": "2026-11-24T18:10:12.000Z",
+      "startTime": "2026-11-24T09:02:40.000Z"
+    },
+    "lastBuild": {
+      "status": "building",
+      "timestamp": "2026-11-24T18:10:05.000Z",
+      "gitHash": "a1b2c3d",
+      "builder": "Executable",
+      "progress": { "current": 42, "total": 120, "percent": 35, "label": "Compiling", "updatedAt": "2026-11-24T18:10:11.000Z" }
+    },
+    "buildStats": { "averageDuration": 18400, "minDuration": 12100, "maxDuration": 31000 },
+    "buildCommand": "pnpm run build"
+  },
+  "tests": {
+    "status": "failure",
+    "enabled": true,
+    "type": "test",
+    "process": {
+      "pid": 48213,
+      "hostname": "mac.local",
+      "isActive": true,
+      "lastHeartbeat": "2026-11-24T18:10:12.000Z",
+      "startTime": "2026-11-24T09:02:40.000Z"
+    },
+    "lastBuild": {
+      "status": "failure",
+      "timestamp": "2026-11-24T18:07:51.000Z",
+      "duration": 9300,
+      "exitCode": 1,
+      "errorSummary": "src/parser.test.ts: expected 3 tokens, got 2",
+      "gitHash": "a1b2c3d",
+      "builder": "Test"
+    },
+    "buildCommand": "pnpm test"
+  },
+  "_paused": false,
+  "_buildQueue": {
+    "enabled": false,
+    "config": { "parallelization": 1, "prioritization": { "enabled": false, "focusDetectionWindow": 300000, "priorityDecayTime": 1800000, "buildTimeoutMultiplier": 2 } }
+  }
+}

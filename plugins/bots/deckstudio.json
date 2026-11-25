@@ -1,0 +1,26 @@
+{
+  "$schema": "../../docs/plugin.schema.json",
+  "deckstudio": "plugin/v1",
+  "id": "bots",
+  "name": "Bots",
+  "version": "1.0.0",
+  "author": "DeckStudio",
+  "description": "Bring your own bots: every bot provider (Grok Bot, JSON files, pushes, commands, plugins) on one page. Format: docs/AGENT-GUIDE.md, \"Bring your own bots\".",
+  "icon": { "glyph": "bot" },
+  "builtin": "bots",
+  "status": { "builtin": "bots", "interval": 2 },
+  "values": { "waiting": "$.waiting", "count": "$.count", "providers": "$.providers" },
+  "actions": {
+    "page": { "title": "Go to the bots page", "builtin": { "type": "page", "page": "bots" }, "params": ["page"] }
+  },
+  "templates": {
+    "pages": {
+      "bots": { "title": "Bots page (every provider)", "what": "Every enabled provider's bots, the ones calling you first; press opens that bot.",
+        "template": { "name": "Bots", "source": "bots", "keys": [], "dials": [], "strip": { "mode": "segments" } } }
+    },
+    "keys": {
+      "waiting": { "title": "Bots waiting on you", "what": "How many bots wait on you (every provider); the lamp lights while any does. Press opens the bots page.",
+        "template": { "glyph": "bot", "title": "bots", "label": "{self.waiting} waiting", "led": "{self.waiting}", "ledColor": "#e5484d", "onPress": { "type": "page", "page": "bots" } } }
+    }
+  }
+}

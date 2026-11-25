@@ -1,0 +1,356 @@
+{
+  "deckstudio": "plugin/v1",
+  "id": "poltergeist",
+  "name": "Poltergeist",
+  "version": "0.1.0",
+  "author": "DeckStudio registry (third-party wrapper, not affiliated with Poltergeist)",
+  "homepage": "https://github.com/steipete/poltergeist",
+  "description": "Per-target build state (ok / building / failed) of one Poltergeist project, and a key to build a target now (in the background, output in a log). Reads poltergeist status --json --config <project>/poltergeist.config.json. Set the project's config path and target names in the plugin's settings.",
+  "icon": {
+    "glyph": "build-tool"
+  },
+  "detect": {
+    "bin": [
+      "poltergeist"
+    ]
+  },
+  "install": {
+    "brew": "steipete/tap/poltergeist",
+    "url": "https://github.com/steipete/poltergeist",
+    "note": "Or: npm install --global @steipete/poltergeist. Then set the project's poltergeist.config.json path and target names in DeckStudio → plugins → Poltergeist → settings."
+  },
+  "settings": {
+    "config": {
+      "type": "string",
+      "title": "Project config",
+      "description": "Your project's poltergeist.config.json (absolute or ~/ path)",
+      "default": "~/Projects/my-app/poltergeist.config.json"
+    },
+    "target1": {
+      "type": "string",
+      "title": "First target",
+      "description": "A target name from poltergeist list (t1_* values)",
+      "default": "app"
+    },
+    "target2": {
+      "type": "string",
+      "title": "Second target",
+      "description": "Another target name (t2_* values)",
+      "default": "tests"
+    }
+  },
+  "status": {
+    "cmd": [
+      "$bin",
+      "status",
+      "--json",
+      "--config",
+      "{settings.config}"
+    ],
+    "interval": 5,
+    "timeout": 20,
+    "stale": 120,
+    "parse": "json"
+  },
+  "values": {
+    "paused": {
+      "path": "$._paused",
+      "map": {
+        "true": "paused",
+        "false": ""
+      }
+    },
+    "t1_build": {
+      "path": "$['{settings.target1}'].lastBuild.status",
+      "default": "none",
+      "stale": "--",
+      "map": {
+        "success": "ok",
+        "failure": "failed",
+        "failed": "failed",
+        "building": "building",
+        "idle": "idle"
+      }
+    },
+    "t1_failed": {
+      "path": "$['{settings.target1}'].lastBuild.status",
+      "default": "",
+      "map": {
+        "success": "",
+        "building": "",
+        "idle": "",
+        "failure": "failed",
+        "failed": "failed"
+      }
+    },
+    "t1_building": {
+      "path": "$['{settings.target1}'].lastBuild.status",
+      "default": "",
+      "map": {
+        "building": "building",
+        "success": "",
+        "failure": "",
+        "failed": "",
+        "idle": ""
+      }
+    },
+    "t1_progress": {
+      "path": "$['{settings.target1}'].lastBuild.progress.percent",
+      "round": 0
+    },
+    "t1_error": "$['{settings.target1}'].lastBuild.errorSummary",
+    "t1_at": "$['{settings.target1}'].lastBuild.timestamp",
+    "t1_daemon": {
+      "path": "$['{settings.target1}'].process.isActive",
+      "default": "stopped",
+      "map": {
+        "true": "watching",
+        "false": "stopped"
+      }
+    },
+    "t2_build": {
+      "path": "$['{settings.target2}'].lastBuild.status",
+      "default": "none",
+      "stale": "--",
+      "map": {
+        "success": "ok",
+        "failure": "failed",
+        "failed": "failed",
+        "building": "building",
+        "idle": "idle"
+      }
+    },
+    "t2_failed": {
+      "path": "$['{settings.target2}'].lastBuild.status",
+      "default": "",
+      "map": {
+        "success": "",
+        "building": "",
+        "idle": "",
+        "failure": "failed",
+        "failed": "failed"
+      }
+    },
+    "t2_building": {
+      "path": "$['{settings.target2}'].lastBuild.status",
+      "default": "",
+      "map": {
+        "building": "building",
+        "success": "",
+        "failure": "",
+        "failed": "",
+        "idle": ""
+      }
+    },
+    "t2_progress": {
+      "path": "$['{settings.target2}'].lastBuild.progress.percent",
+      "round": 0
+    },
+    "t2_error": "$['{settings.target2}'].lastBuild.errorSummary",
+    "t2_at": "$['{settings.target2}'].lastBuild.timestamp",
+    "t2_daemon": {
+      "path": "$['{settings.target2}'].process.isActive",
+      "default": "stopped",
+      "map": {
+        "true": "watching",
+        "false": "stopped"
+      }
+    }
+  },
+  "actions": {
+    "build": {
+      "title": "Build a target now (poltergeist build)",
+      "cmd": [
+        "$bin",
+        "build",
+        "{target}",
+        "--config",
+        "{settings.config}"
+      ],
+      "params": [
+        "target"
+      ],
+      "detach": true,
+      "timeout": 1800,
+      "toast": true
+    },
+    "open_monitor": {
+      "title": "Open the Poltergeist monitor app",
+      "type": "app",
+      "target": "me.steipete.poltergeist.monitor"
+    }
+  },
+  "templates": {
+    "keys": {
+      "target": {
+        "title": "Target build state (first target)",
+        "what": "Shows ok / building / failed for the first target in the plugin settings; red lamp while its last build failed. Press runs poltergeist build <target> in the background (the strip says started, then done / failed).",
+        "template": {
+          "glyph": "build-tool",
+          "label": "{self.settings.target1}",
+          "title": "{self.t1_build}",
+          "led": "{self.t1_failed}",
+          "ledColor": "#e5484d",
+          "onPress": {
+            "type": "plugin",
+            "action": "build",
+            "args": {
+              "target": "{settings.target1}"
+            }
+          }
+        }
+      },
+      "target2": {
+        "title": "Target build state (second target)",
+        "what": "Same for the second target in the plugin settings.",
+        "template": {
+          "glyph": "build-tool",
+          "label": "{self.settings.target2}",
+          "title": "{self.t2_build}",
+          "led": "{self.t2_failed}",
+          "ledColor": "#e5484d",
+          "onPress": {
+            "type": "plugin",
+            "action": "build",
+            "args": {
+              "target": "{settings.target2}"
+            }
+          }
+        }
+      }
+    },
+    "dials": {
+      "target": {
+        "title": "Target build dial (first target)",
+        "what": "Shows the target’s build state; press or tap builds it now.",
+        "template": {
+          "style": "text",
+          "label": "{self.settings.target1}",
+          "glyph": "build-tool",
+          "display": "{self.t1_build}",
+          "readonly": true,
+          "onPress": {
+            "type": "plugin",
+            "action": "build",
+            "args": {
+              "target": "{settings.target1}"
+            }
+          },
+          "onTouch": {
+            "type": "plugin",
+            "action": "build",
+            "args": {
+              "target": "{settings.target1}"
+            }
+          }
+        }
+      }
+    },
+    "pages": {
+      "builds": {
+        "title": "Builds page",
+        "what": "Both targets’ build state keys and dials, plus the paused flag and the monitor app.",
+        "template": {
+          "name": "Builds",
+          "keys": [
+            {
+              "glyph": "build-tool",
+              "label": "{self.settings.target1}",
+              "title": "{self.t1_build}",
+              "led": "{self.t1_failed}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "build",
+                "args": {
+                  "target": "{settings.target1}"
+                }
+              }
+            },
+            {
+              "glyph": "build-tool",
+              "label": "{self.settings.target2}",
+              "title": "{self.t2_build}",
+              "led": "{self.t2_failed}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "build",
+                "args": {
+                  "target": "{settings.target2}"
+                }
+              }
+            },
+            {
+              "glyph": "pause",
+              "label": "{self.paused}",
+              "title": "auto-build",
+              "led": "{self.paused}"
+            },
+            {
+              "glyph": "build-tool",
+              "label": "monitor",
+              "title": "{self._state}",
+              "onPress": {
+                "type": "plugin",
+                "action": "open_monitor"
+              }
+            }
+          ],
+          "dials": [
+            {
+              "style": "text",
+              "label": "{self.settings.target1}",
+              "glyph": "build-tool",
+              "display": "{self.t1_build}",
+              "readonly": true,
+              "onPress": {
+                "type": "plugin",
+                "action": "build",
+                "args": {
+                  "target": "{settings.target1}"
+                }
+              },
+              "onTouch": {
+                "type": "plugin",
+                "action": "build",
+                "args": {
+                  "target": "{settings.target1}"
+                }
+              }
+            },
+            {
+              "style": "text",
+              "label": "{self.settings.target2}",
+              "glyph": "build-tool",
+              "display": "{self.t2_build}",
+              "readonly": true,
+              "onPress": {
+                "type": "plugin",
+                "action": "build",
+                "args": {
+                  "target": "{settings.target2}"
+                }
+              },
+              "onTouch": {
+                "type": "plugin",
+                "action": "build",
+                "args": {
+                  "target": "{settings.target2}"
+                }
+              }
+            }
+          ],
+          "strip": {
+            "mode": "segments"
+          }
+        }
+      }
+    }
+  },
+  "permissions": {
+    "shell": false,
+    "schemes": [],
+    "network": []
+  }
+}

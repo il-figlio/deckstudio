@@ -1,0 +1,383 @@
+#!/usr/bin/env node
+// deckctl — control a running DeckStudio from scripts, hooks, and agents.
+import fs from 'node:fs'
+import path from 'node:path'
+import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const HOME_DIR = process.env.DECKSTUDIO_HOME || path.join(process.env.HOME, '.deckstudio')
+const PORT = Number(process.env.DECKSTUDIO_PORT || 7337)
+const BASE = `http://127.0.0.1:${PORT}`
+
+const USAGE = `deckctl — control DeckStudio (Stream Deck+)
+
+  deckctl start [--takeover]      start the server in the background (logs: ~/.deckstudio/server.log)
+  deckctl stop                    stop the server (device returns to the Elgato logo)
+  deckctl open [--dev] [--print]  open the editor in your browser (a one-time login link, 60 s; --print: just print it;
+                                  --dev: print the link for Vite on :5610)
+  deckctl status                  connection + current page
+  deckctl takeover | release      quit Elgato app and grab the device / hand it back
+
+  deckctl page <id>               switch page
+  deckctl toast "<text>" [ms]     flash a message on the touch strip
+  deckctl brightness <0-100>
+
+  deckctl key  <1-8> [opts]       patch a key on the current (or --page) page
+  deckctl dial <1-4> [opts]       patch a dial / its strip segment  (--value N sets the value)
+  deckctl strip [opts]            patch the touch strip
+      opts: --label --title --icon --bg --fg --border --progress --display --text --value --mode ...
+            any --field value is passed through; numbers are parsed. --json '{...}' for nested data.
+            --page <id>   target page      --persist   save to profile (default: temporary overlay)
+  deckctl clear [--page <id>]     drop temporary overlays
+  deckctl log [-f] [-n 40]        what each press / turn / tap did (follow with -f)
+  deckctl recipe list             ready-made keys / dials / pages
+  deckctl recipe show <id>        what it does + the setup prompt for an agent
+  deckctl recipe apply <id> [--page <id>] [--key 1-8 | --dial 1-4] [--var name=value ...]
+
+  deckctl plugin list             plugins, their source and state          (spec: docs/PLUGINS.md)
+  deckctl plugin info <id>        values, actions, permissions, templates
+  deckctl plugin enable <id> | disable <id>
+  deckctl plugin grant <id> [--shell] [--scheme x]... [--network host]... [--reset]
+                                  allow what its manifest declares (adds to the grants; --reset starts from none)
+  deckctl plugin run <id> <action> [name=value ...] [--value N]
+  deckctl plugin validate <dir|file>   check a deckstudio.json (offline)
+  deckctl plugin init <id> [dir]  scaffold a plugin: manifest, README, example status script
+  deckctl plugin link <dir> | unlink <id>      develop a plugin in place (~/.deckstudio/plugins/<id> → dir)
+  deckctl plugin install <id|path> | uninstall <id>   from the registry (registry/ or DECKSTUDIO_REGISTRY) or a folder
+  deckctl plugin registry         what the registry offers (installed / update available)
+`
+
+function token() {
+  try { return fs.readFileSync(path.join(HOME_DIR, 'token'), 'utf8').trim() }
+  catch { die('No token yet — run `deckctl start` first.') }
+}
+function die(msg) { console.error(msg); process.exit(1) }
+let verified = false
+async function call(method, url, body) {
+  const t = token()
+  if (!verified) { // the program on the port must prove it knows the token before we send it (src/hello.mjs)
+    const v = await (await import('../src/hello.mjs')).verifyServer(BASE, t, { home: HOME_DIR })
+    if (!v.ok) die(v.down ? `DeckStudio is not running on ${BASE} — start it with: deckctl start` : v.why)
+    verified = true
+  }
+  let r
+  try { r = await fetch(BASE + url, { method, headers: { 'x-deck-token': t, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }) }
+  catch { die(`DeckStudio is not running on ${BASE} — start it with: deckctl start`) }
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) die(`error: ${j.error || r.status}`)
+  return j
+}
+const NUMERIC = new Set(['value', 'progress', 'fontSize', 'iconSize', 'min', 'max', 'step', 'decimals', 'default'])
+function parseOpts(args) {
+  const o = {}; let page, persist = false
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === '--persist') { persist = true; continue }
+    if (!a.startsWith('--')) die(`unexpected argument ${a}`)
+    const k = a.slice(2), v = args[++i]
+    if (v === undefined) die(`missing value for ${a}`)
+    if (k === 'page') page = v
+    else if (k === 'json') Object.assign(o, JSON.parse(v))
+    else o[k] = NUMERIC.has(k) && v !== '' && !isNaN(Number(v)) ? Number(v) : (v === 'null' ? null : v)
+  }
+  return { patch: o, page, persist }
+}
+const isUp = async () => { try { await fetch(BASE + '/api/state', { signal: AbortSignal.timeout(800) }); return true } catch { return false } }
+
+const [cmd, ...rest] = process.argv.slice(2)
+switch (cmd) {
+  case 'start': {
+    if (await isUp()) { console.log(`already running → ${BASE}`); break }
+    fs.mkdirSync(HOME_DIR, { recursive: true, mode: 0o700 }); fs.chmodSync(HOME_DIR, 0o700)
+    const log = fs.openSync(path.join(HOME_DIR, 'server.log'), 'a', 0o600); fs.fchmodSync(log, 0o600)
+    const p = spawn(process.execPath, [path.join(ROOT, 'server.mjs'), ...rest], { detached: true, stdio: ['ignore', log, log] })
+    fs.writeFileSync(path.join(HOME_DIR, 'server.pid'), String(p.pid))
+    p.unref()
+    for (let i = 0; i < 30 && !(await isUp()); i++) await new Promise(r => setTimeout(r, 200))
+    console.log((await isUp()) ? `DeckStudio running → ${BASE}` : 'failed to start — see ~/.deckstudio/server.log')
+    break
+  }
+  case 'stop': {
+    try { const pid = Number(fs.readFileSync(path.join(HOME_DIR, 'server.pid'), 'utf8')); process.kill(pid, 'SIGTERM'); console.log('stopped') }
+    catch { console.log('not running (no pid)') }
+    break
+  }
+  case 'open': { // never the token in a URL (it'd show in browser history): a one-time code, valid 60 s, that the
+    // editor trades for the token (POST /api/login). Not in any argv either (`ps -axww` shows every user's argv, and
+    // another user could redeem it first): the link goes to the browser over osascript's stdin, not `open <url>`.
+    if (!(await isUp())) die('DeckStudio is not running — deckctl start')
+    const { code } = await call('POST', '/api/login-code')
+    // --dev (Vite on :5610, cd editor && npm run dev): printed, never opened. Any user can listen on a free port, so
+    // only paste it while your dev server is the one on :5610 (lsof -nP -iTCP:5610 -sTCP:LISTEN).
+    const dev = rest.includes('--dev'), url = `${dev ? 'http://localhost:5610' : BASE}/#c=${code}`
+    if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+\/#c=[0-9a-f]{32}$/.test(url)) die('unexpected login code from the server') // nothing to escape in AppleScript
+    if (dev || rest.includes('--print')) { console.log(url); break }
+    const p = spawn('osascript', ['-'], { stdio: ['pipe', 'ignore', 'inherit'] })
+    p.on('error', () => die(`could not run osascript — open this link yourself (valid 60 s):\n${url}`))
+    p.on('exit', c => { if (c) die('could not open the browser — run deckctl open --print and open the link yourself') })
+    p.stdin.end(`open location "${url}"\n`); break
+  }
+  case 'status': { const s = await call('GET', '/api/state'); console.log(`${s.status.state}${s.status.detail ? ' — ' + s.status.detail : ''}\npage: ${s.page}  (${Object.keys(s.profile.pages).join(', ')})\nbrightness: ${s.brightness}`); break }
+  case 'takeover': console.log((await call('POST', '/api/takeover')).status); break
+  case 'release': console.log((await call('POST', '/api/release', { launchElgato: !rest.includes('--no-elgato') })).status); break
+  case 'page': if (!rest[0]) die('usage: deckctl page <id>'); await call('POST', '/api/goto', { page: rest[0] }); break
+  case 'toast': await call('POST', '/api/toast', { text: rest[0] ?? '', ms: Number(rest[1]) || 1500 }); break
+  case 'brightness': await call('POST', '/api/brightness', { value: Number(rest[0]) }); break
+  case 'key': case 'dial': {
+    const n = Number(rest[0]); const max = cmd === 'key' ? 8 : 4
+    if (!Number.isInteger(n) || n < 1 || n > max) die(`usage: deckctl ${cmd} <1-${max}> --field value ...`)
+    const { patch, page, persist } = parseOpts(rest.slice(1))
+    await call('POST', '/api/control', { kind: cmd, index: n - 1, patch, page, persist }); break
+  }
+  case 'strip': { const { patch, page, persist } = parseOpts(rest); await call('POST', '/api/control', { kind: 'strip', patch, page, persist }); break }
+  case 'recipe': {
+    const sub = rest[0], id = rest[1]
+    const { recipes } = await call('GET', '/api/recipes')
+    if (sub === 'list' || !sub) {
+      let cat = ''
+      for (const r of recipes) { if (r.category !== cat) console.log(`\n${(cat = r.category).toUpperCase()}`); console.log(`  ${r.id.padEnd(22)} ${r.where.padEnd(5)} ${r.title}`) }
+      break
+    }
+    const r = recipes.find(x => x.id === id)
+    if (!r) die(`no recipe "${id}" — deckctl recipe list`)
+    if (sub === 'show') { console.log(`${r.title} (${r.where})\n${r.what}\n${r.needs ? 'needs: ' + r.needs.join(', ') + '\n' : ''}${r.ask ? 'vars: ' + r.ask.map(a => a.name).join(', ') + '\n' : ''}\nPROMPT FOR AN AGENT:\n${r.prompt}`); break }
+    if (sub === 'apply') {
+      const opt = (n) => { const i = rest.indexOf(n); return i >= 0 ? rest[i + 1] : undefined }
+      const vars = {}
+      rest.forEach((a, i) => { if (a === '--var' && rest[i + 1]) { const [k, ...v] = rest[i + 1].split('='); vars[k] = v.join('=') } })
+      const idx = r.where === 'key' ? Number(opt('--key')) - 1 : r.where === 'dial' ? Number(opt('--dial')) - 1 : undefined
+      const out = await call('POST', '/api/recipes/apply', { id, vars, page: opt('--page'), index: idx })
+      console.log('applied', JSON.stringify(out)); break
+    }
+    die('usage: deckctl recipe list | show <id> | apply <id> ...')
+  }
+  case 'log': {
+    const file = path.join(HOME_DIR, 'actions.log')
+    const n = Number(rest[rest.indexOf('-n') + 1]) || 40
+    const color = process.stdout.isTTY
+    const c = (code, s) => (color ? `\x1b[${code}m${s}\x1b[0m` : s)
+    const fmt = l => {
+      let e; try { e = JSON.parse(l) } catch { return l }
+      const where = c(90, `${e.t} ${String(e.page || '').padEnd(9)}`)
+      if (e.ev === 'action') return `${where} ${c(e.ok ? 32 : 31, e.ok ? '  ✓' : '  ✗')} ${String(e.src || '').padEnd(14)} ${e.action}${e.ms != null ? c(90, ` ${e.ms}ms`) : ''}${e.error ? c(31, '  ← ' + e.error) : ''}${e.note ? c(90, '  (' + e.note + ')') : ''}`
+      if (e.ev === 'error') return `${where} ${c(31, '  ! ' + e.msg)}`
+      if (e.ev === 'page') return `${where} ${c(36, `→ page ${e.from} → ${e.to}`)}`
+      if (e.ev === 'front app') return `${where} ${c(90, `  front app: ${e.app}`)}`
+      const what = e.key ? `key ${e.key}` : e.dial ? `dial ${e.dial}` : ''
+      return `${where} ${c(1, e.ev)} ${what}${e.label ? ` "${e.label}"` : ''}${e.delta != null ? ` ${e.delta > 0 ? '+' : ''}${e.delta}` : ''}${e.segment != null ? ` seg ${e.segment}` : ''}${e.dx != null ? ` dx ${e.dx}` : ''}${e.mode ? c(90, ` [${e.mode}]`) : ''}`
+    }
+    const show = txt => txt.split('\n').filter(Boolean).forEach(l => console.log(fmt(l)))
+    let pos = 0
+    try { const all = fs.readFileSync(file, 'utf8'); show(all.split('\n').filter(Boolean).slice(-n).join('\n')); pos = Buffer.byteLength(all) } catch { console.log('(no log yet — press something on the deck)') }
+    if (!rest.includes('-f')) break
+    setInterval(() => {
+      try {
+        const st = fs.statSync(file)
+        if (st.size < pos) pos = 0
+        if (st.size > pos) { const fd = fs.openSync(file, 'r'); const buf = Buffer.alloc(st.size - pos); fs.readSync(fd, buf, 0, buf.length, pos); fs.closeSync(fd); pos = st.size; show(buf.toString('utf8')) }
+      } catch {}
+    }, 250)
+    await new Promise(() => {})
+  }
+  case 'clear': { const { page } = parseOpts(rest); await call('POST', '/api/overlay/clear', { page }); break }
+  case 'plugin': case 'plugins': await plugin(rest); break
+  default: console.log(USAGE); if (cmd && cmd !== 'help' && cmd !== '-h' && cmd !== '--help') process.exit(1)
+}
+
+// ---------- deckctl plugin … (docs/PLUGINS.md) ----------
+async function plugin(args) {
+  const [sub, ...a] = args
+  const I = () => import('../src/plugin-install.mjs')
+  const S = () => import('../src/plugin-schema.mjs')
+  const flag = n => a.includes(n)
+  const opts = n => a.flatMap((x, i) => (x === n && a[i + 1] ? [a[i + 1]] : []))
+  const need = (v, use) => v || die(`usage: deckctl plugin ${use}`)
+  const rescan = async () => { if (await isUp()) await call('POST', '/api/plugins/rescan') }
+  const line = p => `  ${p.id.padEnd(16)} ${String(p.version || '').padEnd(8)} ${String(p.source || '').padEnd(8)} ${String(p.state || '').padEnd(9)} ${p.name || ''}`
+  switch (sub) {
+    case 'list': case 'ls': case undefined: {
+      const { plugins, dirs } = await call('GET', '/api/plugins')
+      console.log(`  ${'id'.padEnd(16)} ${'version'.padEnd(8)} ${'source'.padEnd(8)} ${'state'.padEnd(9)} name`)
+      for (const p of plugins) console.log(line(p) + (p.errors?.length ? `  ← ${p.errors[0]}` : p.error ? `  ← ${p.error}` : ''))
+      console.log(`\nfolders: ${Object.entries(dirs).map(([k, v]) => `${k} ${v.replace(process.env.HOME, '~')}`).join(' · ')}`)
+      return
+    }
+    case 'info': {
+      const p = await call('GET', `/api/plugins/${need(a[0], 'info <id>')}`)
+      const g = p.grants || {}, d = p.permissions || {}
+      console.log(`${p.name} ${p.version}  (${p.id}, ${p.source})  ${p.state}${p.enabled ? '' : ' · off'}${p.error ? ` — ${p.error}` : ''}`)
+      if (p.description) console.log(p.description)
+      if (p.homepage) console.log(p.homepage)
+      console.log(`folder: ${p.dir}`)
+      for (const e of p.errors || []) console.log(`  ✗ ${e}`)
+      for (const w of p.warnings || []) console.log(`  ! ${w}`)
+      if (p.installed === false) console.log(`not installed${p.install?.brew ? ` — brew install ${p.install.brew}` : ''}${p.install?.url ? ` — ${p.install.url}` : ''}${p.install?.note ? ` (${p.install.note})` : ''}`)
+      const perm = [d.shell && `shell ${g.shell ? '✓' : '(not granted)'}`, ...(d.schemes || []).map(s => `scheme ${s} ${g.schemes?.includes(s) ? '✓' : '(not granted)'}`), ...(d.network || []).map(h => `network ${h} ${g.network?.includes(h) ? '✓' : '(not granted)'}`)].filter(Boolean)
+      console.log(`permissions: ${perm.length ? perm.join(' · ') : 'none needed'}`)
+      if (Object.keys(p.values || {}).length) { console.log('values:'); for (const [k, v] of Object.entries(p.values)) console.log(`  {${p.id}.${k}}`.padEnd(32) + ` ${v}`) }
+      else if (p.vars?.length) console.log(`vars: ${p.vars.join(' ')}`)
+      if (p.actions?.length) { console.log('actions:'); for (const x of p.actions) console.log(`  ${x.name.padEnd(18)} ${x.kind.padEnd(7)} ${x.title || ''}${x.params?.length ? `  params: ${x.params.join(', ')}` : ''}${x.blocked ? `  ✗ ${x.blocked}` : ''}`) }
+      const t = Object.entries(p.templates || {}).filter(([, v]) => v.length)
+      if (t.length) console.log(`templates: ${t.map(([k, v]) => `${k} ${v.join(', ')}`).join(' · ')}  (deckctl recipe list: plugin-${p.id}-<name>)`)
+      return
+    }
+    case 'enable': case 'disable': {
+      const p = await call('POST', `/api/plugins/${need(a[0], `${sub} <id>`)}/enable`, { enabled: sub === 'enable' })
+      console.log(`${p.id}: ${p.enabled ? 'on' : 'off'} (${p.state})`)
+      if (p.enabled && p.source !== 'builtin' && p.source !== 'local') console.log('note: an enabled plugin runs its declared commands as you — review them with: deckctl plugin info ' + p.id)
+      return
+    }
+    case 'grant': {
+      const id = need(a[0], 'grant <id> [--shell] [--scheme x] [--network host] [--reset]')
+      const cur = flag('--reset') ? { shell: false, schemes: [], network: [] } : (await call('GET', `/api/plugins/${id}`)).grants || {}
+      const body = { shell: flag('--shell') || !!cur.shell, schemes: [...new Set([...(cur.schemes || []), ...opts('--scheme')])], network: [...new Set([...(cur.network || []), ...opts('--network')])] }
+      const p = await call('POST', `/api/plugins/${id}/grant`, body)
+      console.log(`${p.id} grants: shell ${p.grants.shell ? 'yes' : 'no'} · schemes ${p.grants.schemes.join(', ') || '—'} · network ${p.grants.network.join(', ') || '—'}`)
+      return
+    }
+    case 'run': {
+      const [id, action] = a
+      if (!id || !action) die('usage: deckctl plugin run <id> <action> [name=value ...] [--value N]')
+      const argv = {}
+      let value
+      for (let i = 2; i < a.length; i++) {
+        if (a[i] === '--value') { value = Number(a[++i]); continue }
+        const m = /^([a-zA-Z]\w*)=(.*)$/.exec(a[i])
+        if (!m) die(`expected name=value, got ${a[i]}`)
+        argv[m[1]] = m[2]
+      }
+      await call('POST', `/api/plugins/${id}/action`, { action, args: argv, value })
+      console.log(`ran ${id}.${action}`)
+      return
+    }
+    case 'validate': {
+      const target = need(a[0], 'validate <dir|file>')
+      const file = fs.existsSync(target) && fs.statSync(target).isDirectory() ? path.join(target, 'deckstudio.json') : target
+      let raw
+      try { raw = fs.readFileSync(file, 'utf8') } catch { die(`can't read ${file}`) }
+      const { validateManifest } = await S()
+      const r = validateManifest(raw, { source: 'user' })
+      for (const e of r.errors) console.log(`  ✗ ${e}`)
+      for (const w of r.warnings) console.log(`  ! ${w}`)
+      if (!r.ok) die(`${file}: ${r.errors.length} error(s)`)
+      const m = r.manifest
+      console.log(`✓ ${m.id} ${m.version} — ${Object.keys(m.values).length} values, ${Object.keys(m.actions).length} actions, ${Object.values(m.templates).reduce((n, t) => n + Object.keys(t).length, 0)} templates${m.status ? `, status: ${m.status.kind}` : ''}`)
+      return
+    }
+    case 'init': {
+      const id = need(a[0], 'init <id> [dir]')
+      const { PLUGIN_ID_RE, RESERVED_IDS, validateManifest } = await S()
+      if (!PLUGIN_ID_RE.test(id) || RESERVED_IDS.has(id)) die('id: a-z 0-9 -, up to 32 characters, not a reserved word')
+      const dir = path.resolve(a[1] || id)
+      if (fs.existsSync(path.join(dir, 'deckstudio.json'))) die(`${dir}/deckstudio.json already exists`)
+      fs.mkdirSync(dir, { recursive: true })
+      const name = id.replace(/(^|-)([a-z])/g, (m, s, c) => (s ? ' ' : '') + c.toUpperCase())
+      const manifest = {
+        deckstudio: 'plugin/v1', id, name, version: '0.1.0', description: `${name}: status and actions on the Stream Deck+.`,
+        icon: { glyph: 'plug' },
+        detect: { paths: ['$dir/status.sh'] },
+        status: { cmd: ['$dir/status.sh'], interval: 10 },
+        values: { state: { path: '$.state', default: 'off', stale: 'stale' }, count: { path: '$.count', default: '0' } },
+        actions: {
+          bump: { title: 'Bump the counter', cmd: ['$dir/status.sh', 'bump', '{by}'], params: ['by'], toast: true },
+          reset: { title: 'Reset', cmd: ['$dir/status.sh', 'reset'] },
+        },
+        templates: {
+          keys: { counter: { title: `${name} counter`, what: 'Shows the count; press bumps it.', template: { glyph: 'add', label: '{self.count}', title: '{self.state}', onPress: { type: 'plugin', action: 'bump', args: { by: '1' } } } } },
+          dials: { counter: { title: `${name} dial`, what: 'Turn to bump by the detents, press to reset.', template: { mode: 'actions', label: '{self.count}', onRight: { type: 'plugin', action: 'bump', args: { by: '{delta}' } }, onPress: { type: 'plugin', action: 'reset' } } } },
+        },
+      }
+      const script = `#!/bin/sh
+# ${name} status script for DeckStudio (deckstudio.json → status.cmd / actions).
+# DeckStudio runs it directly (no shell string): "status.sh" prints the status JSON, "status.sh bump N" / "reset" are actions.
+# Keep output small JSON with updated_at, so a crashed tool shows as stale instead of busy.
+STATE="\${DECK_PLUGIN_DIR:-$(dirname "$0")}/.count"
+n=$(cat "$STATE" 2>/dev/null || echo 0)
+case "$1" in
+  bump)  by=\${2:-1}; case "$by" in ''|*[!0-9-]*) by=1;; esac; n=$((n + by)); echo "$n" > "$STATE"; echo "count $n"; exit 0;;
+  reset) echo 0 > "$STATE"; exit 0;;
+esac
+printf '{"state":"ok","count":%s,"updated_at":%s}\\n' "$n" "$(date +%s)"
+`
+      const readme = `# ${name}
+
+A DeckStudio plugin (plugin/v1, see DeckStudio's docs/PLUGINS.md).
+
+- \`deckstudio.json\`: the manifest (status, values, actions, templates).
+- \`status.sh\`: example status command. Replace it with your tool (\`["$bin", "status", "--json"]\` plus \`detect.bin\`).
+
+Try it:
+
+\`\`\`sh
+deckctl plugin validate .
+deckctl plugin link .          # ~/.deckstudio/plugins/${id} → this folder (edits are picked up live)
+deckctl plugin enable ${id}
+deckctl plugin info ${id}      # values: {${id}.state} {${id}.count}
+deckctl plugin run ${id} bump by=2
+deckctl recipe apply plugin-${id}-counter --key 1
+deckctl plugin unlink ${id}
+\`\`\`
+`
+      fs.writeFileSync(path.join(dir, 'deckstudio.json'), JSON.stringify(manifest, null, 2) + '\n')
+      fs.writeFileSync(path.join(dir, 'status.sh'), script, { mode: 0o755 })
+      if (!fs.existsSync(path.join(dir, 'README.md'))) fs.writeFileSync(path.join(dir, 'README.md'), readme)
+      const r = validateManifest(manifest, { source: 'user' })
+      if (!r.ok) die(`scaffold failed to validate: ${r.errors.join('; ')}`)
+      console.log(`created ${dir}\n  deckstudio.json  status.sh  README.md\nnext: deckctl plugin link ${path.relative(process.cwd(), dir) || '.'} && deckctl plugin enable ${id}`)
+      return
+    }
+    case 'link': {
+      const out = (await I()).link(need(a[0], 'link <dir>'))
+      await rescan()
+      console.log(`linked ${out.link} → ${out.target}${out.ok ? '' : `\n  ✗ ${out.errors.join('\n  ✗ ')}`}\nit starts off: deckctl plugin enable ${out.id}`)
+      return
+    }
+    case 'unlink': {
+      const out = (await I()).unlink(need(a[0], 'unlink <id>'))
+      await rescan()
+      console.log(`unlinked ${out.id} (was → ${out.target}; the folder itself is untouched)`)
+      return
+    }
+    case 'install': {
+      const what = need(a[0], 'install <id|path>')
+      const isPath = what.includes('/') || what === '.' || (fs.existsSync(what) && !/^[a-z0-9][a-z0-9-]*$/.test(what))
+      let out
+      if (await isUp()) out = await call('POST', '/api/plugins/install', isPath ? { path: path.resolve(what) } : { id: what })
+      else {
+        out = isPath ? (await I()).installFromDir(what) : await (await I()).installFromRegistry(what)
+        // server down: switch the plugin off in the profile ourselves, like POST /api/plugins/install does, so an update
+        // is reviewed again (a changed manifest would read as off anyway: profile.plugins[id].approved is its old sha256)
+        const pf = path.join(HOME_DIR, 'profile.json')
+        try {
+          const prof = JSON.parse(fs.readFileSync(pf, 'utf8'))
+          const c = prof?.plugins?.[out.id]
+          if (c && (c.enabled || c.approved)) {
+            c.enabled = false; delete c.approved
+            const tmp = `${pf}.${process.pid}.tmp`
+            fs.writeFileSync(tmp, JSON.stringify(prof, null, 2), { mode: 0o600 }); fs.renameSync(tmp, pf)
+          }
+        } catch (e) { if (e.code !== 'ENOENT') console.error(`note: couldn't switch ${out.id} off in ${pf} (${e.message}): check it before you start DeckStudio`) }
+      }
+      console.log(`installed ${out.id} ${out.version} → ${out.dir}${out.replaced ? ' (replaced the previous version: ' + out.previous + ')' : ''}\nit starts off: review it (deckctl plugin info ${out.id}), then deckctl plugin enable ${out.id}`)
+      return
+    }
+    case 'uninstall': {
+      const id = need(a[0], 'uninstall <id>')
+      const out = (await isUp()) ? await call('POST', '/api/plugins/uninstall', { id }) : (await I()).uninstall(id)
+      console.log(`uninstalled ${out.id} (moved to ${out.movedTo})`)
+      return
+    }
+    case 'registry': {
+      const r = (await isUp()) ? await call('GET', '/api/plugins/registry') : await (await I()).listRegistry()
+      if (!r.ok) die(`registry: ${r.error}`)
+      console.log(`registry: ${r.source}`)
+      for (const p of r.plugins) {
+        const st = p.conflict ? 'conflict' : p.update ? 'update' : p.installed ? 'installed' : p.verified && p.valid ? '' : 'broken'
+        console.log(`  ${p.id.padEnd(16)} ${String(p.version).padEnd(8)} ${st.padEnd(9)} ${p.name}${p.tags.length ? `  [${p.tags.join(', ')}]` : ''}${p.errors.length ? `  ✗ ${p.errors[0]}` : ''}`)
+      }
+      return
+    }
+    default: die('usage: deckctl plugin list | info | enable | disable | grant | run | validate | init | link | unlink | install | uninstall | registry')
+  }
+}

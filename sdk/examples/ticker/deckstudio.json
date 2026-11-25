@@ -1,0 +1,73 @@
+{
+  "$schema": "../../../docs/plugin.schema.json",
+  "deckstudio": "plugin/v1",
+  "id": "ticker",
+  "name": "Ticker",
+  "version": "1.0.0",
+  "description": "A counter service: the key shows the count, press adds one.",
+  "author": "DeckStudio SDK example",
+  "icon": {
+    "glyph": "add"
+  },
+  "detect": {
+    "bin": [
+      "$dir/ticker.mjs"
+    ]
+  },
+  "status": {
+    "cmd": [
+      "$dir/ticker.mjs",
+      "status",
+      "--json"
+    ],
+    "interval": 2,
+    "stale": 95
+  },
+  "values": {
+    "state": {
+      "path": "$.state",
+      "default": "off",
+      "stale": "off"
+    },
+    "count": {
+      "path": "$.values.count",
+      "default": "–",
+      "stale": "–"
+    }
+  },
+  "actions": {
+    "bump": {
+      "cmd": [
+        "$dir/ticker.mjs",
+        "bump",
+        "{by}"
+      ],
+      "title": "Add to the count",
+      "params": [
+        "by"
+      ],
+      "toast": true
+    }
+  },
+  "templates": {
+    "keys": {
+      "count": {
+        "title": "Ticker count",
+        "what": "Shows the count; press adds one.",
+        "template": {
+          "glyph": "add",
+          "title": "{self.state}",
+          "label": "{self.count}",
+          "led": "{self.state}",
+          "onPress": {
+            "type": "plugin",
+            "action": "bump",
+            "args": {
+              "by": "1"
+            }
+          }
+        }
+      }
+    }
+  }
+}

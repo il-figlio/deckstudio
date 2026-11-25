@@ -1,0 +1,124 @@
+{
+  "deckstudio": "registry/v1",
+  "plugins": [
+    {
+      "id": "codexbar",
+      "name": "CodexBar",
+      "version": "0.1.0",
+      "description": "Claude and Codex usage limits (5-hour session and weekly %, reset times), provider status incidents and spend, read from CodexBar's bundled CLI: codexbar usage --provider both --format json --status.",
+      "author": "DeckStudio registry (third-party wrapper, not affiliated with CodexBar)",
+      "homepage": "https://github.com/steipete/CodexBar",
+      "icon": {
+        "glyph": "meter"
+      },
+      "path": "plugins/codexbar",
+      "sha256": "bd9635c61993d43799b893956481f2ce8733aca6532b392c851691cdfcab3665",
+      "files": {
+        "README.md": "874b11cfa268175e740b4284f1205a1a7457ac634f2ecbf62a16e781e708a46d",
+        "deckstudio.json": "bd9635c61993d43799b893956481f2ce8733aca6532b392c851691cdfcab3665",
+        "fixtures/usage-both.expect.json": "b9196a3d4effbc7244228b4b5370c09178074b10fc2ed151037aed3393c88f76",
+        "fixtures/usage-both.json": "8a805ca8d09935aca6ce727e106f212badf3f896f71aad9103cf69603474db1c",
+        "registry.json": "9f834e1283a17a3536459b88a549f42ac53aca371e3b52806ea9547cd9f253dd"
+      },
+      "tags": [
+        "ai",
+        "usage",
+        "claude",
+        "codex",
+        "menubar"
+      ],
+      "needs": {
+        "bundle": "com.steipete.codexbar",
+        "bin": "codexbar",
+        "brew": "--cask codexbar"
+      }
+    },
+    {
+      "id": "hello",
+      "name": "Hello",
+      "version": "0.1.0",
+      "description": "A minimal example plugin to copy: a bundled script prints a JSON status, values pick fields out of it, an argv action says hello on the strip.",
+      "author": "DeckStudio registry",
+      "homepage": "",
+      "icon": {
+        "glyph": "face--wink"
+      },
+      "path": "plugins/hello",
+      "sha256": "656fd49809456e30fddd95d142f18a0042581d610d0d67e022cccab5ac6b8b7b",
+      "files": {
+        "README.md": "0e52c1755d8cd242f5437e5ca5badaec7d61468d22233b8acfd81a6f90de46a9",
+        "deckstudio.json": "656fd49809456e30fddd95d142f18a0042581d610d0d67e022cccab5ac6b8b7b",
+        "fixtures/status.expect.json": "98a8275ba72e545c63585ff7d39ddccd2683b1c90aa17abf57fe48806f5cc212",
+        "fixtures/status.json": "84e780ec447b6636b8a7aff0da56084d3a424103ca782ab03e94dff002889c97",
+        "hello-say": "ef354f1dcbfeebe08320a8dfd7d72806797bdb23d3634d4afc3fc1304c55bbd4",
+        "hello-status": "b0e0bcaaa2670b1760005089d0430894dfb957a559f5f33faab770031f9df87e",
+        "registry.json": "fddba1dece39eda73aa69f9063b9f6230852f940a0236e0681ecd695fefbc64e"
+      },
+      "tags": [
+        "example",
+        "template"
+      ],
+      "needs": {}
+    },
+    {
+      "id": "poltergeist",
+      "name": "Poltergeist",
+      "version": "0.1.0",
+      "description": "Per-target build state (ok / building / failed) of one Poltergeist project, and a key to build a target now (in the background, output in a log). Reads poltergeist status --json --config <project>/poltergeist.config.json. Set the project's config path and target names in the plugin's settings.",
+      "author": "DeckStudio registry (third-party wrapper, not affiliated with Poltergeist)",
+      "homepage": "https://github.com/steipete/poltergeist",
+      "icon": {
+        "glyph": "build-tool"
+      },
+      "path": "plugins/poltergeist",
+      "sha256": "ed2d867e7b397fb0de6576aab85bfc49f3a8355599d50d14725ae3cce6451359",
+      "files": {
+        "README.md": "c0c8e5aa0263f4cf8bdc3831298e4e9eb7cdc5e9dda110ce899daceaf3b769ff",
+        "deckstudio.json": "ed2d867e7b397fb0de6576aab85bfc49f3a8355599d50d14725ae3cce6451359",
+        "fixtures/status.expect.json": "88547bee25763c39e2f6aaab8dfeeeb50e5f77641999fcc8e88482ff04b08965",
+        "fixtures/status.json": "afa18041ba8689f72b765706642a57f6ceffd9a28db1ea645ea2264f9a65755f",
+        "registry.json": "4cabf1a11281f9be4cb82bb86bf3884578436522369965e9cc4c125c15b7bff8"
+      },
+      "tags": [
+        "build",
+        "watch",
+        "developer"
+      ],
+      "needs": {
+        "bin": "poltergeist",
+        "brew": "steipete/tap/poltergeist"
+      }
+    },
+    {
+      "id": "repobar",
+      "name": "RepoBar",
+      "version": "0.1.0",
+      "description": "Your RepoBar pinned GitHub repos (sorted by name, up to 6): open PRs and issues per repo, press to open PRs. Reads repobar repos --scope pinned --sort repo --limit 6 --json.",
+      "author": "DeckStudio registry (third-party wrapper, not affiliated with RepoBar)",
+      "homepage": "https://github.com/steipete/RepoBar",
+      "icon": {
+        "glyph": "repo--source-code"
+      },
+      "path": "plugins/repobar",
+      "sha256": "ae86ddf5f5e315b9994e209284a866f19ff6e657197322c9e4c26b96bed34bce",
+      "files": {
+        "README.md": "5c1782a833e90ee2bea0b053da8fd3787a65aff0a42fd3c24a76ecead259c453",
+        "deckstudio.json": "ae86ddf5f5e315b9994e209284a866f19ff6e657197322c9e4c26b96bed34bce",
+        "fixtures/repos-pinned.expect.json": "67eaebe329ae65327e12be855444e797c7650ab1a5f603cbd2ad3c50bb832bee",
+        "fixtures/repos-pinned.json": "3f2991b178745a1e922b2eb7047190871bc46326b69228063e530033b64a42d8",
+        "registry.json": "4e2a623238569f01cb09d308387dfdd638145721207dea904dd849af0c16e2b8"
+      },
+      "tags": [
+        "github",
+        "ci",
+        "pull-requests",
+        "menubar"
+      ],
+      "needs": {
+        "bundle": "com.steipete.repobar",
+        "bin": "repobar",
+        "brew": "--cask repobar"
+      }
+    }
+  ]
+}

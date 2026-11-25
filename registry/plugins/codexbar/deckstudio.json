@@ -1,0 +1,114 @@
+{
+  "deckstudio": "plugin/v1",
+  "id": "codexbar",
+  "name": "CodexBar",
+  "version": "0.1.0",
+  "author": "DeckStudio registry (third-party wrapper, not affiliated with CodexBar)",
+  "homepage": "https://github.com/steipete/CodexBar",
+  "description": "Claude and Codex usage limits (5-hour session and weekly %, reset times), provider status incidents and spend, read from CodexBar's bundled CLI: codexbar usage --provider both --format json --status.",
+  "icon": { "glyph": "meter" },
+  "detect": {
+    "bundle": "com.steipete.codexbar",
+    "bin": ["codexbar", "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI", "~/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"]
+  },
+  "install": {
+    "brew": "--cask codexbar",
+    "url": "https://github.com/steipete/CodexBar",
+    "note": "Then CodexBar → Settings → Advanced → Install CLI (or use the CLI inside the app bundle, which is detected too)."
+  },
+  "status": {
+    "cmd": ["$bin", "usage", "--provider", "both", "--format", "json", "--status"],
+    "interval": 120,
+    "timeout": 60,
+    "stale": 600,
+    "parse": "json"
+  },
+  "values": {
+    "codex_provider": "$[0].provider",
+    "codex_session": { "path": "$[0].usage.primary.usedPercent", "round": 0, "stale": "--" },
+    "codex_week": { "path": "$[0].usage.secondary.usedPercent", "round": 0, "stale": "--" },
+    "codex_hot": { "path": "$[0].usage.primary.usedPercent", "atLeast": 80 },
+    "codex_week_hot": { "path": "$[0].usage.secondary.usedPercent", "atLeast": 80 },
+    "codex_reset": "$[0].usage.primary.resetsAt",
+    "codex_week_reset": "$[0].usage.secondary.resetsAt",
+    "codex_pace": { "path": "$[0].pace.primary.willLastToReset", "map": { "true": "", "false": "runs out" } },
+    "codex_incident": { "path": "$[0].status.indicator", "map": { "none": "", "unknown": "" } },
+    "codex_status": { "path": "$[0].status.description", "default": "" },
+    "codex_credits": { "path": "$[0].credits.remaining", "round": 1 },
+    "codex_error": "$[0].error.message",
+    "claude_provider": "$[1].provider",
+    "claude_session": { "path": "$[1].usage.primary.usedPercent", "round": 0, "stale": "--" },
+    "claude_week": { "path": "$[1].usage.secondary.usedPercent", "round": 0, "stale": "--" },
+    "claude_hot": { "path": "$[1].usage.primary.usedPercent", "atLeast": 80 },
+    "claude_week_hot": { "path": "$[1].usage.secondary.usedPercent", "atLeast": 80 },
+    "claude_reset": "$[1].usage.primary.resetsAt",
+    "claude_week_reset": "$[1].usage.secondary.resetsAt",
+    "claude_pace": { "path": "$[1].pace.primary.willLastToReset", "map": { "true": "", "false": "runs out" } },
+    "claude_incident": { "path": "$[1].status.indicator", "map": { "none": "", "unknown": "" } },
+    "claude_status": { "path": "$[1].status.description", "default": "" },
+    "claude_cost": { "path": "$[1].usage.providerCost.used", "round": 2 },
+    "claude_cost_limit": { "path": "$[1].usage.providerCost.limit", "round": 2 },
+    "claude_error": "$[1].error.message",
+    "updated": "$[1].usage.updatedAt"
+  },
+  "actions": {
+    "open": { "title": "Open CodexBar", "type": "app", "target": "bundle" },
+    "claude_status_page": { "title": "Anthropic status page", "url": "https://status.anthropic.com/" },
+    "codex_status_page": { "title": "OpenAI status page", "url": "https://status.openai.com/" }
+  },
+  "templates": {
+    "keys": {
+      "claude_session": { "title": "Claude 5-hour session %", "what": "Claude's 5-hour session usage. Lamp: 80 % or more used, CodexBar projects the session runs out before it resets, or Anthropic reports an incident. Press opens CodexBar, hold opens the status page.",
+        "template": { "logo": "app-claude", "label": "{self.claude_session}%", "title": "claude 5h", "led": "{self.claude_hot}{self.claude_pace}{self.claude_incident}", "ledColor": "#e5484d",
+          "onPress": { "type": "plugin", "action": "open" }, "onLongPress": { "type": "plugin", "action": "claude_status_page" } } },
+      "claude_week": { "title": "Claude weekly %", "what": "Claude's weekly usage; lamp at 80 % or more, or during an Anthropic incident. Press opens CodexBar.",
+        "template": { "logo": "app-claude", "label": "{self.claude_week}%", "title": "claude week", "led": "{self.claude_week_hot}{self.claude_incident}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" } } },
+      "codex_session": { "title": "Codex 5-hour session %", "what": "Codex's 5-hour session usage. Lamp: 80 % or more used, projected to run out before reset, or an OpenAI incident. Press opens CodexBar, hold opens the status page.",
+        "template": { "logo": "app-codex", "label": "{self.codex_session}%", "title": "codex 5h", "led": "{self.codex_hot}{self.codex_pace}{self.codex_incident}", "ledColor": "#e5484d",
+          "onPress": { "type": "plugin", "action": "open" }, "onLongPress": { "type": "plugin", "action": "codex_status_page" } } },
+      "codex_week": { "title": "Codex weekly %", "what": "Codex's weekly usage; lamp at 80 % or more, or during an OpenAI incident. Press opens CodexBar.",
+        "template": { "logo": "app-codex", "label": "{self.codex_week}%", "title": "codex week", "led": "{self.codex_week_hot}{self.codex_incident}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" } } },
+      "incidents": { "title": "Provider incidents", "what": "Lit while Anthropic or OpenAI reports an incident (minor, major, critical, maintenance). Press opens the Anthropic status page, hold the OpenAI one.",
+        "template": { "glyph": "warning--alt", "label": "status", "title": "{self.claude_incident} {self.codex_incident}", "led": "{self.claude_incident}{self.codex_incident}", "ledColor": "#f5a524",
+          "onPress": { "type": "plugin", "action": "claude_status_page" }, "onLongPress": { "type": "plugin", "action": "codex_status_page" } } },
+      "claude_cost": { "title": "Claude extra-usage spend", "what": "Claude extra-usage spend this period (when CodexBar reports it). Press opens CodexBar.",
+        "template": { "glyph": "currency--dollar", "face": "lcd", "label": "{self.claude_cost}", "caption": "of {self.claude_cost_limit}", "onPress": { "type": "plugin", "action": "open" } } },
+      "open": { "title": "Open CodexBar", "what": "Opens CodexBar; the caption shows the plugin state (ok, stale, missing…).",
+        "template": { "glyph": "meter", "label": "CodexBar", "title": "{self._state}", "onPress": { "type": "plugin", "action": "open" } } }
+    },
+    "dials": {
+      "claude_session": { "title": "Claude 5 h gauge (read-only)", "what": "Read-only gauge: the needle follows Claude's 5-hour session %. Press opens CodexBar.",
+        "template": { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.claude_session}", "readonly": true, "label": "Claude 5h", "display": "{self.claude_session}%", "onPress": { "type": "plugin", "action": "open" } } },
+      "claude_week": { "title": "Claude weekly gauge (read-only)", "what": "Read-only gauge with Claude's weekly %.",
+        "template": { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.claude_week}", "readonly": true, "label": "Claude wk", "display": "{self.claude_week}%", "onPress": { "type": "plugin", "action": "open" } } },
+      "codex_session": { "title": "Codex 5 h gauge (read-only)", "what": "Read-only gauge with Codex's 5-hour session %.",
+        "template": { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.codex_session}", "readonly": true, "label": "Codex 5h", "display": "{self.codex_session}%", "onPress": { "type": "plugin", "action": "open" } } },
+      "codex_week": { "title": "Codex weekly gauge (read-only)", "what": "Read-only bar with Codex's weekly %.",
+        "template": { "mode": "value", "style": "bar", "min": 0, "max": 100, "value": "{self.codex_week}", "readonly": true, "label": "Codex wk", "display": "{self.codex_week}%", "onPress": { "type": "plugin", "action": "open" } } }
+    },
+    "pages": {
+      "ai_limits": { "title": "AI limits page", "what": "Claude and Codex session / weekly limits on keys and gauges, provider incidents and spend.",
+        "template": {
+          "name": "AI limits",
+          "keys": [
+            { "logo": "app-claude", "label": "{self.claude_session}%", "title": "claude 5h", "led": "{self.claude_hot}{self.claude_pace}{self.claude_incident}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" }, "onLongPress": { "type": "plugin", "action": "claude_status_page" } },
+            { "logo": "app-claude", "label": "{self.claude_week}%", "title": "claude week", "led": "{self.claude_week_hot}{self.claude_incident}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" } },
+            { "logo": "app-codex", "label": "{self.codex_session}%", "title": "codex 5h", "led": "{self.codex_hot}{self.codex_pace}{self.codex_incident}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" }, "onLongPress": { "type": "plugin", "action": "codex_status_page" } },
+            { "logo": "app-codex", "label": "{self.codex_week}%", "title": "codex week", "led": "{self.codex_week_hot}{self.codex_incident}", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "open" } },
+            { "glyph": "warning--alt", "label": "status", "title": "{self.claude_incident} {self.codex_incident}", "led": "{self.claude_incident}{self.codex_incident}", "ledColor": "#f5a524", "onPress": { "type": "plugin", "action": "claude_status_page" }, "onLongPress": { "type": "plugin", "action": "codex_status_page" } },
+            { "glyph": "currency--dollar", "face": "lcd", "label": "{self.claude_cost}", "caption": "of {self.claude_cost_limit}", "onPress": { "type": "plugin", "action": "open" } },
+            { "face": "lcd", "label": "{self.codex_credits}", "caption": "codex credits", "onPress": { "type": "plugin", "action": "open" } },
+            { "glyph": "meter", "label": "CodexBar", "title": "{self._state}", "onPress": { "type": "plugin", "action": "open" } }
+          ],
+          "dials": [
+            { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.claude_session}", "readonly": true, "label": "Claude 5h", "display": "{self.claude_session}%", "onPress": { "type": "plugin", "action": "open" } },
+            { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.claude_week}", "readonly": true, "label": "Claude wk", "display": "{self.claude_week}%", "onPress": { "type": "plugin", "action": "open" } },
+            { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.codex_session}", "readonly": true, "label": "Codex 5h", "display": "{self.codex_session}%", "onPress": { "type": "plugin", "action": "open" } },
+            { "mode": "value", "style": "gauge", "min": 0, "max": 100, "value": "{self.codex_week}", "readonly": true, "label": "Codex wk", "display": "{self.codex_week}%", "onPress": { "type": "plugin", "action": "open" } }
+          ],
+          "strip": { "mode": "segments" }
+        } }
+    }
+  },
+  "permissions": { "shell": false, "schemes": [], "network": [] }
+}

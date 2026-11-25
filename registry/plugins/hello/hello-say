@@ -1,0 +1,4 @@
+#!/bin/sh
+# Example action for the "hello" DeckStudio plugin. Arguments arrive as argv (never through a shell);
+# the first line of output is shown on the strip (toast: true).
+printf 'hello, %s\n' "${1:-world}"

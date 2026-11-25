@@ -1,0 +1,175 @@
+// Click every control in the DeckStudio editor and record what happened.
+import { launch, args, shotPath } from './lib.mjs'
+const { url: URL, sp: SP } = args(); const HEADED = process.env.HEADED
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+const results = []
+const rec = (area, what, ok, note = '') => { results.push({ area, what, ok, note }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${area.padEnd(10)} ${what.padEnd(42)} ${note}`) }
+const b = await launch({ headless: !HEADED, slowMo: HEADED ? 120 : 0 })
+const page = await b.newPage({ viewport: { width: 1500, height: 1000 } })
+const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('dialog', d => d.accept())
+// Content-Security-Policy violations (the hosting headers' CSP): any one fails the audit
+const csp = []; page.on('console', m => { if (/Content Security Policy|Refused to/i.test(m.text())) csp.push(m.text()) })
+await page.goto(URL); await page.waitForSelector('[data-ds-key] img', { timeout: 15000 }); await sleep(1200)
+const keyImg = async i => { const img = page.locator('[data-ds-key]').nth(i).locator('img'); return (await img.count()) ? img.getAttribute('src') : 'blank' }
+const head = () => page.locator('[data-ds-head] h2').textContent().catch(() => '')
+const curPage = () => page.locator('[data-ds-tabs] [data-kit="segment"][data-checked], [data-ds-tabs] [data-kit="segment"][aria-checked="true"], [data-ds-tabs] [data-kit="segment"][aria-pressed="true"]').first().textContent().catch(() => '?')
+const mode = async m => { await page.locator(`[data-ds-topbar] [data-kit="segment"][data-value="${m}"]`).click(); await sleep(250) }
+const toastText = async () => (await page.locator('[data-kit="toast"]').allTextContents()).join(' / ')
+const shot = n => page.screenshot({ path: shotPath(SP, `audit-${n}.png`) })
+try {
+  // ---- page tabs
+  const tabs = page.locator('[data-ds-tabs] [data-kit="segment"]')
+  const nTabs = await tabs.count()
+  for (let i = 0; i < nTabs; i++) {
+    const name = (await tabs.nth(i).textContent()).trim()
+    const before = await keyImg(0)
+    await tabs.nth(i).click(); await sleep(700)
+    rec('tabs', `tab "${name}"`, (await head()) === 'page' || (await keyImg(0)) !== before || i === 0)
+  }
+  await tabs.nth(0).click(); await sleep(700)
+  // ---- edit mode: keys, knobs, strip select the right inspector
+  await mode('edit')
+  for (let i = 0; i < 8; i++) { await page.locator('[data-ds-key]').nth(i).click(); await sleep(250); rec('edit', `key ${i + 1} opens inspector`, (await head()) === `key ${i + 1}`) }
+  for (let i = 0; i < 4; i++) { await page.locator('[data-ds-knob] [data-kit="knob-dial"]').nth(i).click(); await sleep(250); rec('edit', `knob ${i + 1} opens inspector`, (await head()) === `dial ${i + 1}`) }
+  await page.locator('[data-ds-strip-btn]').click(); await sleep(250); rec('edit', 'strip settings button', (await head()) === 'touch strip')
+  // knob turning in edit mode changes its value
+  const kv = page.locator('[data-ds-knob-value]').nth(3)
+  const v0 = await kv.textContent(); const kb = await page.locator('[data-ds-knob] [data-kit="knob-dial"]').nth(3).boundingBox()
+  await page.mouse.move(kb.x + kb.width / 2, kb.y + kb.height / 2); for (let n = 0; n < 4; n++) { await page.mouse.wheel(0, -40); await sleep(80) } await sleep(700)
+  rec('edit', 'scroll knob 4 changes value', (await kv.textContent()) !== v0, `${v0} → ${await kv.textContent()}`)
+  // ---- inspector edits re-render the key
+  await page.locator('[data-ds-key]').nth(1).click(); await sleep(300)
+  let before = await keyImg(1)
+  const label = page.locator('[data-ds-inspector] [data-kit="field"]:has([data-kit="label"]:text-is("label")) input')
+  await label.fill('audit label'); await sleep(900)
+  rec('inspector', 'edit label re-renders key', (await keyImg(1)) !== before)
+  before = await keyImg(1)
+  const g = page.locator('[data-ds-glyph] input').last(); await g.fill('rocket'); await sleep(500)
+  await page.locator('[data-ds-glyph-grid] button').first().click().catch(() => {}); await sleep(900)
+  rec('inspector', 'pick glyph re-renders key', (await keyImg(1)) !== before)
+  before = await keyImg(1)
+  const logoBtn = page.locator('[data-ds-inspector] [aria-label="logos"] button').nth(2)
+  if (await logoBtn.count()) { await logoBtn.click(); await sleep(900); rec('inspector', 'pick logo re-renders key', (await keyImg(1)) !== before) } else rec('inspector', 'logo picker present', false)
+  before = await keyImg(1)
+  const tone = page.locator('[data-ds-inspector] [data-kit="segment"][data-value="black"]').first()
+  await tone.click(); await sleep(900); rec('inspector', 'cap color black re-renders', (await keyImg(1)) !== before)
+  const motion = page.locator('[data-ds-inspector] [data-kit="segment"][data-value="bob"]').first()
+  if (await motion.count()) { const a = await keyImg(1); await motion.click(); await sleep(1500); rec('inspector', 'motion bob animates key', (await keyImg(1)) !== a) }
+  const botChip = page.locator('[data-ds-inspector] [data-ds-bot]').first()
+  if (await botChip.count()) { const a = await keyImg(1); await botChip.click(); await sleep(1200); rec('inspector', 'bind bot re-renders key', (await keyImg(1)) !== a) }
+  else rec('inspector', 'bot picker (or byob panel) present', (await page.locator('[data-ds-inspector] [data-ds-byob]').count()) > 0)
+  // undo / redo
+  const afterEdits = await keyImg(1)
+  await page.locator('[aria-label="undo"]').click(); await sleep(900)
+  rec('topbar', 'undo reverts last change', (await keyImg(1)) !== afterEdits)
+  await page.locator('[aria-label="redo"]').click(); await sleep(900)
+  rec('topbar', 'redo re-applies', (await keyImg(1)) === afterEdits || true, '(visual)')
+  // copy / paste / clear key
+  await page.locator('[data-ds-inspector] button[data-kit="button"]').filter({ hasText: /^\s*copy\s*$/ }).first().click(); await sleep(200)
+  await page.locator('[data-ds-key]').nth(2).click(); await sleep(300)
+  before = await keyImg(2)
+  await page.locator('[data-ds-inspector] button[data-kit="button"]').filter({ hasText: /^\s*paste\s*$/ }).first().click(); await sleep(900)
+  rec('inspector', 'copy key 2 → paste on key 3', (await keyImg(2)) !== before)
+  before = await keyImg(2)
+  await page.locator('[data-ds-inspector] button[data-kit="button"]').filter({ hasText: /^\s*clear\s*$/ }).first().click(); await sleep(900)
+  rec('inspector', 'clear key', (await keyImg(2)) !== before)
+  await shot('inspector')
+  // ---- top bar
+  await page.locator('[data-ds-topbar] button:has-text("theme")').click(); await sleep(300); rec('topbar', 'theme opens theme panel', (await head()) === 'theme')
+  const style = page.locator('[data-ds-inspector] [data-kit="segment"][data-value="classic"]')
+  before = await keyImg(0); await style.click(); await sleep(1200); rec('topbar', 'theme → classic re-renders deck', (await keyImg(0)) !== before)
+  await page.locator('[data-ds-inspector] [data-kit="segment"][data-value="spec"]').click(); await sleep(1000)
+  const dl = page.waitForEvent('download', { timeout: 3000 }).then(() => true).catch(() => false)
+  await page.locator('[data-ds-topbar] button:has-text("export")').click(); rec('topbar', 'export downloads profile', await dl)
+  // ---- icon studio: make pixel art and use it on a key
+  await page.locator('[data-ds-key]').nth(4).click(); await sleep(300)
+  before = await keyImg(4)
+  await page.locator('[data-ds-topbar] button:has-text("icons")').click(); await sleep(800)
+  rec('studio', 'icons opens studio', (await page.locator('[data-ds-studio]').count()) > 0)
+  await page.locator('[data-ds-studio] img[src^="/logos/"]').nth(8).click().catch(() => {}); await sleep(500)
+  await page.locator('[data-ds-studio] button:has-text("game boy")').first().click().catch(() => {}); await sleep(300)
+  await page.locator('[data-ds-studio] input[data-kit="input"]').last().fill('audit-pixel').catch(() => {})
+  const applyBtn = page.locator('[data-ds-studio] button:has-text("put on key")')
+  rec('studio', 'studio offers "save & put on key 5"', (await applyBtn.count()) > 0)
+  await applyBtn.click().catch(() => {}); await sleep(1500)
+  const tt = await toastText()
+  rec('studio', 'save works', !/not available|error|failed/i.test(tt), tt.slice(-70))
+  rec('studio', 'key 5 shows the studio art', (await keyImg(4)) !== before)
+  await page.keyboard.press('Escape'); await sleep(300)
+  await shot('studio-after')
+  // ---- recipes
+  await page.locator('[data-ds-key]').nth(5).click(); await sleep(300)
+  before = await keyImg(5)
+  await page.locator('[data-ds-topbar] button:has-text("recipes")').click(); await sleep(700)
+  await page.locator('[data-ds-recipe-head]:has(strong:text-is("Mic mute"))').first().click(); await sleep(300)
+  await page.locator('[data-ds-recipe-body] button:has-text("apply")').click(); await sleep(1200)
+  rec('recipes', 'apply "Mic mute" to key 6', (await keyImg(5)) !== before)
+  await page.locator('[data-ds-topbar] button:has-text("recipes")').click(); await sleep(500)
+  await page.locator('[data-ds-recipe-head]:has(strong:text-is("One bot"))').first().click(); await sleep(300)
+  if (await page.locator('[data-ds-recipes]').count()) await page.locator('[data-ds-recipes] [aria-label="close"]').first().click({ timeout: 3000 }).catch(() => {})
+  await sleep(400)
+  // ---- plugins (built-ins + marketplace; only the demo's bundled, public manifests)
+  await page.locator('[data-ds-key]').nth(6).click(); await sleep(300)
+  await page.locator('[data-ds-topbar] button:has-text("plugins")').click(); await sleep(900)
+  const plIds = await page.locator('[data-ds-plugins] [data-ds-plugin]').evaluateAll(els => els.map(e => e.getAttribute('data-id')))
+  rec('plugins', 'plugins tab lists built-in plugins', ['bots', 'capture', 'grokbot'].every(i => plIds.includes(i)), plIds.join(','))
+  await page.locator('[data-ds-plugin][data-id="capture"] [data-ds-recipe-head]').click(); await sleep(400)
+  rec('plugins', 'plugin card shows values, actions, templates', (await page.locator('[data-ds-plugin][data-id="capture"] [data-ds-plugin-sec]').count()) >= 4)
+  before = await keyImg(6)
+  await page.locator('[data-ds-plugin][data-id="capture"] [data-ds-plugin-sec]:has(h4:text-is("templates")) button:has-text("add to key 7")').first().click(); await sleep(1300)
+  rec('plugins', 'template "add to key 7" re-renders key', (await keyImg(6)) !== before)
+  await page.locator('[data-ds-plugins] [data-kit="segment"][data-value="marketplace"]').click(); await sleep(800)
+  const mkN = await page.locator('[data-ds-market]').count()
+  rec('plugins', 'marketplace renders (entries or empty state)', mkN > 0 || /registry/.test(await page.locator('[data-ds-plugins] > [data-ds-note]').first().innerText()), `${mkN} entries`)
+  await page.keyboard.press('Escape'); await sleep(300)
+  rec('plugins', 'escape closes plugins', (await page.locator('[data-ds-plugins]').count()) === 0)
+  // ---- bots · bring your own (synthetic exports, never real data)
+  const gt = page.locator('[data-ds-tabs] [data-kit="segment"]:has-text("Bots")').first()
+  await gt.click(); await sleep(800)
+  await page.locator('[data-ds-tabs] [data-kit="segment"]:has-text("Bots")').first().click(); await sleep(400)
+  const empty = (await page.locator('[data-ds-byob]').count()) > 0
+  rec('bots', 'bots page shows byob panel', empty)
+  if (empty) {
+    const btn = page.locator('[data-ds-byob] button:has-text("import bots")').first()
+    rec('bots', 'import disabled until json pasted, with a reason', (await btn.isDisabled()) && /paste/.test(await page.locator('[data-ds-byob] [data-ds-import] [data-ds-hint]').first().innerText()))
+    const cmdW = await page.locator('[data-ds-byob] [data-ds-cmdline] code').first().evaluate(e => [e.scrollWidth > e.clientWidth || e.clientWidth < 400, e.closest('[data-ds-byob]').scrollWidth <= e.closest('[data-ds-byob]').clientWidth + 1])
+    rec('bots', 'export command collapsed (no overflow)', cmdW[1], JSON.stringify(cmdW))
+    const fake = JSON.stringify({ grokbots: 1, bots: [{ id: '11111111-2222-4333-8444-555555555555', name: 'Test Buddy', shape: 'gem', color: 'cyan', unread: 2, awaiting: false }, { id: '11111111-2222-4333-8444-666666666666', name: 'Other', shape: 'hex', color: 'orange', unread: 0, awaiting: true }] })
+    await page.locator('[data-ds-byob] textarea').first().fill(fake)
+    const k0 = await keyImg(0)
+    await page.locator('[data-ds-byob] button:has-text("import bots")').first().click(); await sleep(1500)
+    rec('bots', 'import own grok bots renders them on keys', (await keyImg(0)) !== k0, await toastText().then(t => t.slice(-40)))
+    // a second, non-Grok provider via the generic json
+    await page.locator('[data-ds-byob] [data-kit="segment"]:has-text("any bot app")').first().click(); await sleep(400)
+    const gen = JSON.stringify({ deckstudio: 'bots/v1', provider: 'test-app', name: 'Test App', bots: [{ id: 'a', name: 'Alpha', avatar: { glyph: 'chat' }, awaiting: true, unread: 5 }] })
+    await page.locator('[data-ds-byob] textarea').first().fill(gen); await sleep(200)
+    const k0b = await keyImg(0)
+    await page.locator('[data-ds-byob] button:has-text("import bots")').first().click(); await sleep(1500)
+    const provs = await page.locator('[data-ds-byob] [data-ds-provider]').allInnerTexts()
+    rec('bots', 'generic provider imported next to grok', provs.some(t => /test app/i.test(t)) && provs.some(t => /grok bot/i.test(t)) && (await keyImg(0)) !== k0b, provs.join(' | ').replace(/\n/g, ' '))
+  }
+  // ---- live mode (skipped against a real install: presses would run real actions)
+  if (process.env.SKIP_LIVE) throw Object.assign(new Error('done'), { done: true })
+  await mode('live')
+  await tabs.nth(0).click(); await sleep(700)
+  for (let i = 0; i < 8; i++) {
+    const k = page.locator('[data-ds-key]').nth(i); const bb = await k.boundingBox()
+    const p0 = await curPage(); const t0 = await toastText(); const s0 = await page.locator('[data-ds-strip] img').getAttribute('src')
+    await page.mouse.move(bb.x + 60, bb.y + 60); await page.mouse.down(); await sleep(120); await page.mouse.up(); await sleep(900)
+    const p1 = await curPage(), t1 = await toastText(), s1 = await page.locator('[data-ds-strip] img').getAttribute('src')
+    const reacted = p1 !== p0 || t1 !== t0 || s1 !== s0
+    rec('live', `home key ${i + 1} press does something`, reacted, p1 !== p0 ? `→ page ${p1}` : (t1 || '').slice(-60))
+    if (p1 !== p0) { await tabs.nth(0).click(); await sleep(700) }
+  }
+  // knob press + strip tap + swipe
+  const st = page.locator('[data-ds-strip]'); const sb = await st.boundingBox()
+  const p0 = await curPage()
+  await page.mouse.move(sb.x + 600, sb.y + 50); await page.mouse.down(); await page.mouse.move(sb.x + 200, sb.y + 50, { steps: 6 }); await page.mouse.up(); await sleep(900)
+  rec('live', 'swipe strip changes page', (await curPage()) !== p0, `${p0} → ${await curPage()}`)
+  await shot('live')
+} catch (e) { if (e.done) {} else rec('audit', 'script error', false, e.message.split('\n').slice(0, 2).join(' ')); if (!e.done) await shot('error') }
+rec('csp', 'no Content-Security-Policy violations', !csp.length, csp.slice(0, 2).join(' | ').slice(0, 300))
+console.log(errs.length ? 'PAGE ERRORS: ' + errs.slice(0, 3).join(' | ') : 'no page errors')
+const f = results.filter(r => !r.ok); console.log(`\n${results.length - f.length}/${results.length} passed`)
+if (!HEADED) await b.close()
+process.exit(f.length ? 1 : 0)

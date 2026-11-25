@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><!-- ante: an apex with a crossbar and three nodes -->
+<path d="M16 5L6 26"/><path d="M16 5l10 21"/><path d="M10.3 18h11.4"/>
+<circle cx="16" cy="5" r="2" fill="currentColor" stroke="none"/><circle cx="6" cy="26" r="2" fill="currentColor" stroke="none"/><circle cx="26" cy="26" r="2" fill="currentColor" stroke="none"/></svg>

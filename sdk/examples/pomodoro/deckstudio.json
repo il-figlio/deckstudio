@@ -1,0 +1,34 @@
+{
+  "$schema": "../../../docs/plugin.schema.json",
+  "deckstudio": "plugin/v1",
+  "id": "pomodoro",
+  "name": "Pomodoro",
+  "version": "1.0.0",
+  "author": "DeckStudio SDK example",
+  "description": "A focus timer. Shows the time left on a key or dial; press to start, hold to stop.",
+  "icon": { "glyph": "timer" },
+  "detect": { "bin": ["pomodoro", "~/.local/bin/pomodoro"] },
+  "install": { "note": "In sdk/examples/pomodoro: swift build -c release && cp .build/release/pomodoro ~/.local/bin/" },
+  "status": { "file": "~/Library/Application Support/Pomodoro/deckstudio-status.json", "interval": 1, "stale": 95 },
+  "values": {
+    "state": { "path": "$.state", "default": "off", "stale": "off" },
+    "time": { "path": "$.values.time", "default": "--:--", "stale": "--:--" },
+    "left": { "path": "$.values.left", "default": 0, "stale": 0 }
+  },
+  "actions": {
+    "start": { "title": "Start a focus timer", "cmd": ["$bin", "start", "{minutes}"], "params": ["minutes"], "toast": true },
+    "stop": { "title": "Stop the timer", "cmd": ["$bin", "stop"] }
+  },
+  "templates": {
+    "keys": {
+      "timer": { "title": "Pomodoro (25 min)", "what": "Shows the time left; press starts 25 minutes, hold stops.",
+        "template": { "glyph": "timer", "title": "{self.state}", "label": "{self.time}", "led": "{self.left}",
+          "onPress": { "type": "plugin", "action": "start", "args": { "minutes": "25" } }, "onLongPress": { "type": "plugin", "action": "stop" } } }
+    },
+    "dials": {
+      "timer": { "title": "Pomodoro dial", "what": "Turn to pick 5–60 minutes, press to start; the strip shows the time left.",
+        "template": { "mode": "value", "label": "Focus", "glyph": "timer", "min": 5, "max": 60, "step": 5, "default": 25, "unit": "min", "style": "text", "display": "{self.time}",
+          "onPress": { "type": "plugin", "action": "start", "args": { "minutes": "{value}" } }, "onTouch": { "type": "plugin", "action": "stop" } } }
+    }
+  }
+}

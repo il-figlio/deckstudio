@@ -1,0 +1,435 @@
+{
+  "deckstudio": "plugin/v1",
+  "id": "repobar",
+  "name": "RepoBar",
+  "version": "0.1.0",
+  "author": "DeckStudio registry (third-party wrapper, not affiliated with RepoBar)",
+  "homepage": "https://github.com/steipete/RepoBar",
+  "description": "Your RepoBar pinned GitHub repos (sorted by name, up to 6): open PRs and issues per repo, press to open PRs. Reads repobar repos --scope pinned --sort repo --limit 6 --json.",
+  "icon": {
+    "glyph": "repo--source-code"
+  },
+  "detect": {
+    "bundle": "com.steipete.repobar",
+    "bin": [
+      "repobar",
+      "/Applications/RepoBar.app/Contents/MacOS/repobarcli",
+      "~/Applications/RepoBar.app/Contents/MacOS/repobarcli"
+    ]
+  },
+  "install": {
+    "brew": "--cask repobar",
+    "url": "https://github.com/steipete/RepoBar",
+    "note": "Sign in to RepoBar and pin repos; install the CLI from RepoBar → Preferences → Advanced → CLI (the CLI inside the app bundle is detected too)."
+  },
+  "status": {
+    "cmd": [
+      "$bin",
+      "repos",
+      "--scope",
+      "pinned",
+      "--sort",
+      "repo",
+      "--limit",
+      "6",
+      "--json"
+    ],
+    "interval": 300,
+    "timeout": 45,
+    "stale": 1200,
+    "parse": "json"
+  },
+  "values": {
+    "count": {
+      "path": "$.length",
+      "default": "0"
+    },
+    "r1_owner": "$[0].owner",
+    "r1_repo": "$[0].name",
+    "r1_prs": {
+      "path": "$[0].openPulls",
+      "default": ""
+    },
+    "r1_issues": {
+      "path": "$[0].openIssues",
+      "default": ""
+    },
+    "r1_ci": {
+      "path": "$[0].ciStatus",
+      "default": "",
+      "map": {
+        "failing": "failing",
+        "passing": "",
+        "pending": "",
+        "unknown": ""
+      }
+    },
+    "r2_owner": "$[1].owner",
+    "r2_repo": "$[1].name",
+    "r2_prs": {
+      "path": "$[1].openPulls",
+      "default": ""
+    },
+    "r2_issues": {
+      "path": "$[1].openIssues",
+      "default": ""
+    },
+    "r2_ci": {
+      "path": "$[1].ciStatus",
+      "default": "",
+      "map": {
+        "failing": "failing",
+        "passing": "",
+        "pending": "",
+        "unknown": ""
+      }
+    },
+    "r3_owner": "$[2].owner",
+    "r3_repo": "$[2].name",
+    "r3_prs": {
+      "path": "$[2].openPulls",
+      "default": ""
+    },
+    "r3_issues": {
+      "path": "$[2].openIssues",
+      "default": ""
+    },
+    "r3_ci": {
+      "path": "$[2].ciStatus",
+      "default": "",
+      "map": {
+        "failing": "failing",
+        "passing": "",
+        "pending": "",
+        "unknown": ""
+      }
+    },
+    "r4_owner": "$[3].owner",
+    "r4_repo": "$[3].name",
+    "r4_prs": {
+      "path": "$[3].openPulls",
+      "default": ""
+    },
+    "r4_issues": {
+      "path": "$[3].openIssues",
+      "default": ""
+    },
+    "r4_ci": {
+      "path": "$[3].ciStatus",
+      "default": "",
+      "map": {
+        "failing": "failing",
+        "passing": "",
+        "pending": "",
+        "unknown": ""
+      }
+    },
+    "r5_owner": "$[4].owner",
+    "r5_repo": "$[4].name",
+    "r5_prs": {
+      "path": "$[4].openPulls",
+      "default": ""
+    },
+    "r5_issues": {
+      "path": "$[4].openIssues",
+      "default": ""
+    },
+    "r5_ci": {
+      "path": "$[4].ciStatus",
+      "default": "",
+      "map": {
+        "failing": "failing",
+        "passing": "",
+        "pending": "",
+        "unknown": ""
+      }
+    },
+    "r6_owner": "$[5].owner",
+    "r6_repo": "$[5].name",
+    "r6_prs": {
+      "path": "$[5].openPulls",
+      "default": ""
+    },
+    "r6_issues": {
+      "path": "$[5].openIssues",
+      "default": ""
+    },
+    "r6_ci": {
+      "path": "$[5].ciStatus",
+      "default": "",
+      "map": {
+        "failing": "failing",
+        "passing": "",
+        "pending": "",
+        "unknown": ""
+      }
+    }
+  },
+  "actions": {
+    "open": {
+      "title": "Open RepoBar",
+      "type": "app",
+      "target": "bundle"
+    },
+    "prs": {
+      "title": "Open a repo’s pull requests",
+      "url": "https://github.com/{repo|path}/pulls",
+      "params": [
+        "repo"
+      ]
+    },
+    "issues": {
+      "title": "Open a repo’s issues",
+      "url": "https://github.com/{repo|path}/issues",
+      "params": [
+        "repo"
+      ]
+    },
+    "ci": {
+      "title": "Open a repo’s Actions runs",
+      "url": "https://github.com/{repo|path}/actions",
+      "params": [
+        "repo"
+      ]
+    },
+    "my_prs": {
+      "title": "Your open pull requests (github.com/pulls)",
+      "url": "https://github.com/pulls"
+    }
+  },
+  "templates": {
+    "keys": {
+      "repo": {
+        "title": "Pinned repo (slot 1): PRs badge, CI lamp",
+        "what": "Slot 1 of your RepoBar pinned repos (sorted by name). Badge: open PRs; red lamp: failing CI (needs ciStatus in repobar repos --json, see README). Press opens its PRs, hold its Actions runs. For slot N, change r1 → rN everywhere (the press args too).",
+        "template": {
+          "glyph": "repo--source-code",
+          "label": "{self.r1_repo}",
+          "title": "{self.r1_owner}",
+          "badge": "{self.r1_prs}",
+          "led": "{self.r1_ci}",
+          "ledColor": "#e5484d",
+          "onPress": {
+            "type": "plugin",
+            "action": "prs",
+            "args": {
+              "repo": "{self.r1_owner}/{self.r1_repo}"
+            }
+          },
+          "onLongPress": {
+            "type": "plugin",
+            "action": "ci",
+            "args": {
+              "repo": "{self.r1_owner}/{self.r1_repo}"
+            }
+          }
+        }
+      },
+      "repo_by_name": {
+        "title": "Any repo: open its PRs",
+        "what": "Opens https://github.com/<owner>/<repo>/pulls; set repo to \"owner/name\" in the press args. Hold opens its Actions runs.",
+        "template": {
+          "glyph": "pull-request",
+          "label": "REPO",
+          "title": "OWNER",
+          "onPress": {
+            "type": "plugin",
+            "action": "prs",
+            "args": {
+              "repo": "OWNER/REPO"
+            }
+          },
+          "onLongPress": {
+            "type": "plugin",
+            "action": "ci",
+            "args": {
+              "repo": "OWNER/REPO"
+            }
+          }
+        }
+      },
+      "my_prs": {
+        "title": "Your pull requests",
+        "what": "Opens github.com/pulls.",
+        "template": {
+          "glyph": "pull-request",
+          "label": "my PRs",
+          "onPress": {
+            "type": "plugin",
+            "action": "my_prs"
+          }
+        }
+      }
+    },
+    "pages": {
+      "repos": {
+        "title": "Pinned repos page",
+        "what": "Your first 6 RepoBar pinned repos (by name) with PR badges and CI lamps, plus your PRs and RepoBar.",
+        "template": {
+          "name": "Repos",
+          "keys": [
+            {
+              "glyph": "repo--source-code",
+              "label": "{self.r1_repo}",
+              "title": "{self.r1_owner}",
+              "badge": "{self.r1_prs}",
+              "led": "{self.r1_ci}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "prs",
+                "args": {
+                  "repo": "{self.r1_owner}/{self.r1_repo}"
+                }
+              },
+              "onLongPress": {
+                "type": "plugin",
+                "action": "ci",
+                "args": {
+                  "repo": "{self.r1_owner}/{self.r1_repo}"
+                }
+              }
+            },
+            {
+              "glyph": "repo--source-code",
+              "label": "{self.r2_repo}",
+              "title": "{self.r2_owner}",
+              "badge": "{self.r2_prs}",
+              "led": "{self.r2_ci}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "prs",
+                "args": {
+                  "repo": "{self.r2_owner}/{self.r2_repo}"
+                }
+              },
+              "onLongPress": {
+                "type": "plugin",
+                "action": "ci",
+                "args": {
+                  "repo": "{self.r2_owner}/{self.r2_repo}"
+                }
+              }
+            },
+            {
+              "glyph": "repo--source-code",
+              "label": "{self.r3_repo}",
+              "title": "{self.r3_owner}",
+              "badge": "{self.r3_prs}",
+              "led": "{self.r3_ci}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "prs",
+                "args": {
+                  "repo": "{self.r3_owner}/{self.r3_repo}"
+                }
+              },
+              "onLongPress": {
+                "type": "plugin",
+                "action": "ci",
+                "args": {
+                  "repo": "{self.r3_owner}/{self.r3_repo}"
+                }
+              }
+            },
+            {
+              "glyph": "repo--source-code",
+              "label": "{self.r4_repo}",
+              "title": "{self.r4_owner}",
+              "badge": "{self.r4_prs}",
+              "led": "{self.r4_ci}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "prs",
+                "args": {
+                  "repo": "{self.r4_owner}/{self.r4_repo}"
+                }
+              },
+              "onLongPress": {
+                "type": "plugin",
+                "action": "ci",
+                "args": {
+                  "repo": "{self.r4_owner}/{self.r4_repo}"
+                }
+              }
+            },
+            {
+              "glyph": "repo--source-code",
+              "label": "{self.r5_repo}",
+              "title": "{self.r5_owner}",
+              "badge": "{self.r5_prs}",
+              "led": "{self.r5_ci}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "prs",
+                "args": {
+                  "repo": "{self.r5_owner}/{self.r5_repo}"
+                }
+              },
+              "onLongPress": {
+                "type": "plugin",
+                "action": "ci",
+                "args": {
+                  "repo": "{self.r5_owner}/{self.r5_repo}"
+                }
+              }
+            },
+            {
+              "glyph": "repo--source-code",
+              "label": "{self.r6_repo}",
+              "title": "{self.r6_owner}",
+              "badge": "{self.r6_prs}",
+              "led": "{self.r6_ci}",
+              "ledColor": "#e5484d",
+              "onPress": {
+                "type": "plugin",
+                "action": "prs",
+                "args": {
+                  "repo": "{self.r6_owner}/{self.r6_repo}"
+                }
+              },
+              "onLongPress": {
+                "type": "plugin",
+                "action": "ci",
+                "args": {
+                  "repo": "{self.r6_owner}/{self.r6_repo}"
+                }
+              }
+            },
+            {
+              "glyph": "pull-request",
+              "label": "my PRs",
+              "title": "{self.count} pinned",
+              "onPress": {
+                "type": "plugin",
+                "action": "my_prs"
+              }
+            },
+            {
+              "glyph": "repo--source-code",
+              "label": "RepoBar",
+              "title": "{self._state}",
+              "onPress": {
+                "type": "plugin",
+                "action": "open"
+              }
+            }
+          ],
+          "dials": [],
+          "strip": {
+            "mode": "segments"
+          }
+        }
+      }
+    }
+  },
+  "permissions": {
+    "shell": false,
+    "schemes": [],
+    "network": []
+  }
+}

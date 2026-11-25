@@ -1,0 +1,92 @@
+{
+  "deckstudio": "plugin/v1",
+  "id": "fake-good",
+  "name": "fake good",
+  "version": "0.1.0",
+  "description": "Scratch Plug: status and actions on the Stream Deck+.",
+  "icon": "icon.svg",
+  "detect": {
+    "paths": [
+      "$dir/status.sh"
+    ]
+  },
+  "status": {
+    "cmd": [
+      "$dir/status.sh"
+    ],
+    "interval": 10
+  },
+  "values": {
+    "state": {
+      "path": "$.state",
+      "default": "off",
+      "stale": "stale"
+    },
+    "count": {
+      "path": "$.count",
+      "default": "0"
+    }
+  },
+  "actions": {
+    "bump": {
+      "title": "Bump the counter",
+      "cmd": [
+        "$dir/status.sh",
+        "bump",
+        "{by}"
+      ],
+      "params": [
+        "by"
+      ],
+      "toast": true
+    },
+    "reset": {
+      "title": "Reset",
+      "cmd": [
+        "$dir/status.sh",
+        "reset"
+      ]
+    }
+  },
+  "templates": {
+    "keys": {
+      "counter": {
+        "title": "Scratch Plug counter",
+        "what": "Shows the count; press bumps it.",
+        "template": {
+          "glyph": "add",
+          "label": "{self.count}",
+          "title": "{self.state}",
+          "onPress": {
+            "type": "plugin",
+            "action": "bump",
+            "args": {
+              "by": "1"
+            }
+          }
+        }
+      }
+    },
+    "dials": {
+      "counter": {
+        "title": "Scratch Plug dial",
+        "what": "Turn to bump by the detents, press to reset.",
+        "template": {
+          "mode": "actions",
+          "label": "{self.count}",
+          "onRight": {
+            "type": "plugin",
+            "action": "bump",
+            "args": {
+              "by": "{delta}"
+            }
+          },
+          "onPress": {
+            "type": "plugin",
+            "action": "reset"
+          }
+        }
+      }
+    }
+  }
+}

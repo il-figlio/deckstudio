@@ -1,0 +1,69 @@
+{
+  "name": "deckstudio",
+  "version": "0.1.0",
+  "description": "Open-source SDK and editor for the Elgato Stream Deck+ (keys, dials, touch strip) over direct HID. Not affiliated with Elgato or Corsair.",
+  "license": "MIT",
+  "homepage": "https://deckstudio.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/il-figlio/deckstudio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/il-figlio/deckstudio/issues"
+  },
+  "keywords": [
+    "stream-deck",
+    "stream-deck-plus",
+    "elgato",
+    "hid",
+    "macos",
+    "touch-strip",
+    "mcp",
+    "agents",
+    "sdk",
+    "editor"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "os": [
+    "darwin"
+  ],
+  "private": true,
+  "main": "server.mjs",
+  "type": "module",
+  "bin": {
+    "deckctl": "bin/deckctl",
+    "deckstudio-mcp": "bin/deckstudio-mcp"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "takeover": "node server.mjs --takeover",
+    "build:helper": "swiftc -O -o bin/deckhelper helper/deckhelper.swift -framework AppKit -framework CoreAudio -framework CoreMediaIO",
+    "build": "npm run build:helper && cd editor && (if [ -f package-lock.json ]; then npm ci; else npm install; fi) && npm run build",
+    "build:demo": "cd editor && npm run build:demo",
+    "build:demo:public": "cd editor && npm run build:demo:public",
+    "test": "node --test --test-reporter=spec \"test/unit/*.test.mjs\" \"sdk/ts/deckkit/test/*.test.js\"",
+    "test:e2e": "node test/e2e/run.mjs",
+    "record:demo": "node test/e2e/record-demo.mjs",
+    "test:swift": "npm run build:helper && swift test --package-path sdk/swift/DeckKit",
+    "test:live": "node test/live/mcp-live.mjs",
+    "typecheck": "cd editor && npx tsc -b",
+    "registry:check": "node registry/scripts/check.mjs && node registry/scripts/build-index.mjs --check"
+  },
+  "dependencies": {
+    "@carbon/icons": "^11.92.0",
+    "@elgato-stream-deck/node": "^7.9.0",
+    "@ibm/plex-mono": "^2.5.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@napi-rs/canvas": "^1.2.0",
+    "omggif": "^1.0.10",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  },
+  "overrides": {
+    "tar": "^7.5.23"
+  }
+}

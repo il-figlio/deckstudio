@@ -1,0 +1,49 @@
+{
+  "$schema": "../../docs/plugin.schema.json",
+  "deckstudio": "plugin/v1",
+  "id": "capture",
+  "name": "Capture",
+  "version": "1.0.0",
+  "author": "DeckStudio",
+  "description": "Screenshots and screen recording through /usr/sbin/screencapture (src/capture.mjs). Needs Screen Recording for the app that starts DeckStudio.",
+  "icon": { "glyph": "camera" },
+  "builtin": "capture",
+  "status": { "builtin": "capture", "interval": 1 },
+  "values": {
+    "recording": { "path": "$.recording", "map": { "on": "on", "": "off" }, "default": "off" },
+    "rec_time": "$.rec_time",
+    "last": "$.last_capture"
+  },
+  "actions": {
+    "screen": { "title": "Full screen → file", "builtin": { "type": "capture", "mode": "screen" }, "params": ["delay", "delayDial", "cursor", "sound", "to"] },
+    "screen-clipboard": { "title": "Full screen → clipboard", "builtin": { "type": "capture", "mode": "screen", "to": "clipboard" } },
+    "selection": { "title": "Selection → file", "builtin": { "type": "capture", "mode": "selection" }, "params": ["to"] },
+    "selection-clipboard": { "title": "Selection → clipboard", "builtin": { "type": "capture", "mode": "selection", "to": "clipboard" } },
+    "window": { "title": "Window → file", "builtin": { "type": "capture", "mode": "window" }, "params": ["to"] },
+    "window-clipboard": { "title": "Window → clipboard", "builtin": { "type": "capture", "mode": "window", "to": "clipboard" } },
+    "record": { "title": "Record screen (toggle)", "builtin": { "type": "capture", "mode": "record" }, "params": ["audio", "clicks", "cursor", "maxSeconds"] },
+    "toolbar": { "title": "Screenshot toolbar (⌘⇧5)", "builtin": { "type": "capture", "mode": "toolbar" } },
+    "folder": { "title": "Open the screenshots folder", "builtin": { "type": "capture", "mode": "folder" } },
+    "copy-last": { "title": "Copy the last capture's path", "builtin": { "type": "capture", "mode": "copy-last" } },
+    "reveal-last": { "title": "Show the last capture in Finder", "builtin": { "type": "capture", "mode": "reveal-last" } },
+    "open-last": { "title": "Open the last capture", "builtin": { "type": "capture", "mode": "open-last" } },
+    "check": { "title": "Check Screen Recording permission", "builtin": { "type": "capture", "mode": "check" } }
+  },
+  "templates": {
+    "keys": {
+      "snip": { "title": "Snip (selection, hold: clipboard)", "what": "Drag to select a screenshot; hold to send it to the clipboard instead.",
+        "template": { "glyph": "crop", "label": "Snip", "onPress": { "type": "plugin", "action": "selection" }, "onLongPress": { "type": "plugin", "action": "selection-clipboard" } } },
+      "record": { "title": "Record screen (toggle)", "what": "Press to record, press again to stop; the key turns red and counts while recording. Hold opens the ⌘⇧5 toolbar.",
+        "template": { "glyph": "recording", "title": "hold: toolbar", "label": "Record", "tone": "black", "ledColor": "#e5484d", "onPress": { "type": "plugin", "action": "record" }, "onLongPress": { "type": "plugin", "action": "toolbar" } } },
+      "last": { "title": "Last capture", "what": "Shows the last capture; press copies its path, hold reveals it in Finder.",
+        "template": { "face": "lcd", "title": "last", "label": "{self.last}", "onPress": { "type": "plugin", "action": "copy-last" }, "onLongPress": { "type": "plugin", "action": "reveal-last" } } }
+    },
+    "dials": {
+      "timed": { "title": "Timed screenshot dial", "what": "Turn to set the seconds, press to take a full-screen shot after that delay.",
+        "template": { "mode": "value", "label": "Timer", "glyph": "timer", "min": 0, "max": 30, "step": 1, "default": 5, "unit": "s", "style": "bar",
+          "onPress": { "type": "plugin", "action": "screen", "args": { "delay": "{value}" } }, "onTouch": { "type": "plugin", "action": "screen", "args": { "delay": "{value}" } } } },
+      "recording": { "title": "Recording dial", "what": "Shows the recording time; press starts / stops a recording.",
+        "template": { "label": "Rec", "glyph": "recording", "style": "text", "display": "{self.rec_time}", "onPress": { "type": "plugin", "action": "record" }, "onTouch": { "type": "plugin", "action": "record" } } }
+    }
+  }
+}

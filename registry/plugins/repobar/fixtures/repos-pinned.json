@@ -1,0 +1,37 @@
+[
+  {
+    "activityActor" : "octocat",
+    "activityDate" : 785694120.5,
+    "activityTitle" : "Fix flaky CI on macOS 26",
+    "activityUrl" : "https:\/\/github.com\/example-org\/api\/pull\/412",
+    "fullName" : "example-org\/api",
+    "name" : "api",
+    "openIssues" : 14,
+    "openPulls" : 3,
+    "owner" : "example-org",
+    "pushedAt" : 785694000,
+    "repoUrl" : "https:\/\/github.com\/example-org\/api",
+    "stars" : 210
+  },
+  {
+    "activityDate" : 785600000,
+    "fullName" : "example-org\/web",
+    "name" : "web",
+    "openIssues" : 0,
+    "openPulls" : 0,
+    "owner" : "example-org",
+    "pushedAt" : 785600000,
+    "repoUrl" : "https:\/\/github.com\/example-org\/web",
+    "stars" : 12
+  },
+  {
+    "error" : "Rate limited until 18:30",
+    "fullName" : "someone\/tool",
+    "name" : "tool",
+    "openIssues" : 2,
+    "openPulls" : 7,
+    "owner" : "someone",
+    "repoUrl" : "https:\/\/github.com\/someone\/tool",
+    "stars" : 1530
+  }
+]

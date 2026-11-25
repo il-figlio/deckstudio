@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Actions are pinned to commit SHAs (the tag is in the comment); checkout keeps no token on disk.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: ubuntu (unit, typecheck, demo e2e)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            editor/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: editor
+      - name: Unit tests
+        run: npm test
+      - name: Editor typecheck
+        run: npm run typecheck
+      # registry/: every manifest validates with no warnings, fixtures and PluginHost dry-runs pass, index.json is current
+      - name: Plugin registry checks
+        run: node registry/scripts/check.mjs && node registry/scripts/build-index.mjs --check
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Demo build + browser audits
+        run: npm run test:e2e
+        env:
+          E2E_SHOTS: ${{ runner.temp }}/e2e-shots
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: e2e-screenshots
+          path: ${{ runner.temp }}/e2e-shots
+          if-no-files-found: ignore
+
+  macos:
+    name: macos (Swift helper, SDK, unit)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Build the Swift helper
+        run: npm run build:helper
+      - name: Swift SDK tests
+        run: swift test --package-path sdk/swift/DeckKit
+      - name: Unit tests
+        run: npm test

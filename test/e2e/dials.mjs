@@ -1,0 +1,35 @@
+// System page: CPU/MEM/DISK dials are read-only; turning browses; editor knob doesn't fake-rotate.
+import { launch, args, shotPath } from './lib.mjs'
+const { url: URL0, sp: SP } = args(); const TAG = 'demo'
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+const b = await launch({ headless: true })
+const page = await b.newPage({ viewport: { width: 1500, height: 1000 } })
+const errs = []; page.on('pageerror', e => errs.push(e.message))
+await page.goto(URL0); await page.waitForSelector('[data-ds-key]'); await sleep(800)
+let fail = 0; const t = (n, ok, x = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n} ${x}`); if (!ok) fail++ }
+await page.locator('[data-ds-tabs] [data-kit="segment"][data-value="system"]').click(); await sleep(1500)
+await page.locator('[data-ds-topbar] [data-kit="segment"][data-value="live"]').click(); await sleep(400)
+const knob = i => page.locator('[data-ds-knob]').nth(i)
+const turnOf = i => knob(i).evaluate(e => e.style.getPropertyValue('--turn'))
+const strip = () => page.locator('[data-ds-strip] img').first().getAttribute('src').catch(() => '')
+t('cpu knob marked read-only', await knob(0).getAttribute('data-readonly') === 'true')
+t('volume knob not read-only', await knob(3).getAttribute('data-readonly') === null)
+await page.screenshot({ path: shotPath(SP, `dials-${TAG}-idle.png`) })
+const turn0 = await turnOf(0), s0 = await strip()
+const box = await knob(0).locator('[data-kit="knob-dial"]').boundingBox()
+await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+for (let n = 0; n < 2; n++) { await page.mouse.wheel(0, -40); await sleep(150) }
+await sleep(1200)
+t('cpu knob did not rotate', (await turnOf(0)) === turn0, `${turn0} → ${await turnOf(0)}`)
+t('strip changed (browse item shown)', (await strip()) !== s0)
+await page.screenshot({ path: shotPath(SP, `dials-${TAG}-browse.png`) })
+// edit mode: inspector explains
+await page.locator('[data-ds-topbar] [data-kit="segment"][data-value="edit"]').click(); await sleep(300)
+await knob(2).locator('[data-kit="knob-dial"]').click(); await sleep(400)
+const insp = await page.locator('[data-ds-inspector]').innerText()
+t('inspector explains read-only', /read-only live readout/i.test(insp))
+t('inspector shows browse command', /turn to browse/i.test(insp))
+await page.screenshot({ path: shotPath(SP, `dials-${TAG}-inspector.png`) })
+await page.locator('[data-ds-topbar] [data-kit="segment"][data-value="live"]').click(); await sleep(200)
+console.log('errors:', errs.slice(0, 5)); console.log(fail ? 'FAIL' : 'PASS')
+await b.close(); process.exit(fail ? 1 : 0)

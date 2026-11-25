@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deckstudio.local/plugin.schema.json",
+  "title": "DeckStudio plugin manifest (deckstudio.json, plugin/v1)",
+  "description": "A small macOS tool exposed to the Stream Deck+ through DeckStudio. Spec: docs/PLUGINS.md. The authoritative validator is validateManifest in src/plugin-schema.mjs; this schema is for editors and authoring tools.",
+  "type": "object",
+  "required": ["deckstudio", "id", "name", "version"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "deckstudio": { "const": "plugin/v1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$", "not": { "enum": ["self", "plugin", "plugins", "deckstudio", "deck", "page", "value", "out", "settings"] }, "description": "Unique id; template vars are {id.value}." },
+    "name": { "type": "string", "maxLength": 40 },
+    "version": { "type": "string", "maxLength": 20 },
+    "author": { "type": "string", "maxLength": 80 },
+    "homepage": { "type": "string", "pattern": "^https://" },
+    "description": { "type": "string", "maxLength": 300 },
+    "icon": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[\\w.-]{1,64}\\.(png|svg)$", "description": "A file in the plugin folder (served at /plugin-icon/<id>.<ext>)." },
+        { "type": "object", "required": ["glyph"], "properties": { "glyph": { "type": "string", "pattern": "^[A-Za-z0-9-]{1,80}$" } }, "additionalProperties": false },
+        { "type": "object", "required": ["logo"], "properties": { "logo": { "type": "string", "pattern": "^[a-z0-9-]{1,80}$" } }, "additionalProperties": false }
+      ]
+    },
+    "builtin": { "enum": ["capture", "bots", "grokbot"], "description": "Only for plugins shipped in DeckStudio's own plugins/ folder." },
+    "detect": {
+      "type": "object",
+      "description": "Installed when any entry matches (no detect: always installed). The first bin found is $bin; the first installed bundle is the app.",
+      "properties": {
+        "bundle": { "$ref": "#/$defs/strings", "description": "Bundle ids (checked with NSWorkspace)." },
+        "bin": { "$ref": "#/$defs/strings", "description": "Executables: absolute, ~/ or $dir/ paths, or a bare name looked up on PATH (+ /opt/homebrew/bin, /usr/local/bin, ~/.local/bin, ~/bin)." },
+        "paths": { "$ref": "#/$defs/strings", "description": "Files or folders whose existence means installed." }
+      },
+      "additionalProperties": false
+    },
+    "install": {
+      "type": "object",
+      "description": "Shown to the user; DeckStudio never installs anything by itself.",
+      "properties": { "brew": { "type": "string", "maxLength": 100 }, "url": { "type": "string", "pattern": "^https://" }, "note": { "type": "string", "maxLength": 200 } },
+      "additionalProperties": false
+    },
+    "status": { "$ref": "#/$defs/transport" },
+    "bots": { "$ref": "#/$defs/transport", "description": "The plugin is also a bring-your-own-bots provider: this transport yields a bots/v1 document (docs/AGENT-GUIDE.md)." },
+    "values": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/$defs/path" },
+          {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "$ref": "#/$defs/path" },
+              "default": { "type": ["string", "number"], "description": "When the path finds nothing (or before the first read)." },
+              "stale": { "type": ["string", "number"], "description": "While the status is stale (else default, else empty)." },
+              "round": { "type": "integer", "minimum": 0, "maximum": 6 },
+              "map": { "type": "object", "additionalProperties": { "type": ["string", "number"] }, "description": "Exact text → shown text (true/false/numbers as text); with tests, applied to then / else." },
+              "above": { "type": "number", "description": "Test: the number is > this. With tests the value shows then (\"on\") when every test holds, else else (\"\")." },
+              "below": { "type": "number", "description": "Test: the number is < this." },
+              "atLeast": { "type": "number", "description": "Test: the number is ≥ this, e.g. { \"path\": \"$.pct\", \"atLeast\": 80 } lights a lamp from 80." },
+              "atMost": { "type": "number", "description": "Test: the number is ≤ this." },
+              "equals": { "type": ["string", "number", "boolean"], "description": "Test: the value's text equals this." },
+              "then": { "type": ["string", "number"], "description": "Shown when every test holds (default \"on\")." },
+              "else": { "type": ["string", "number"], "description": "Shown when a test fails (default \"\")." }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "actions": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+      "additionalProperties": { "$ref": "#/$defs/action" }
+    },
+    "templates": {
+      "type": "object",
+      "description": "Become recipes (ids plugin-<id>-<name>), applied only while the plugin is on. {self.x} means {<id>.x}; { type: plugin } without plugin means this one. Presentation fields and actions of type plugin (this plugin only), page, back, none or a multi of those: no poll / browse commands, shell, applescript, keys, hold-keys, type, http, shortcut, open or app actions.",
+      "properties": {
+        "keys": { "$ref": "#/$defs/templates" },
+        "dials": { "$ref": "#/$defs/templates" },
+        "pages": { "$ref": "#/$defs/templates" }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "maxProperties": 32,
+      "description": "What the user can change in the editor (saved in profile.plugins[id].settings, never in the manifest). {settings.<name>} in the plugin's argv (after argv[0]), urls, http bodies, action args, a status file path and value paths; $DECK_SETTINGS_<NAME> in the env; {<id>.settings.<name>} (templates: {self.settings.<name>}) on keys.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+      "additionalProperties": { "$ref": "#/$defs/setting" }
+    },
+    "permissions": {
+      "type": "object",
+      "description": "What the plugin asks for. Nothing here is granted until the user allows it (profile.plugins[id].grants).",
+      "properties": {
+        "shell": { "type": "boolean", "description": "Shell-string commands, and argv whose program is a shell, interpreter or wrapper, or anything other than $bin / detect.bin / $dir/…." },
+        "schemes": { "type": "array", "maxItems": 8, "items": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]{1,30}$" }, "description": "url schemes besides https its url actions open." },
+        "network": { "type": "array", "maxItems": 8, "items": { "type": "string" }, "description": "Hosts (host or host:port) besides 127.0.0.1 / localhost / [::1] for http status / actions." }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "strings": { "oneOf": [{ "type": "string" }, { "type": "array", "maxItems": 8, "items": { "type": "string" } }] },
+    "path": { "type": "string", "pattern": "^\\$", "description": "JSONPath-lite: $, $.a.b, $.a[0], $.a[-1], $['odd key'], $.list.length; a bracket may hold a setting: $['{settings.target}']" },
+    "cmd": {
+      "oneOf": [
+        { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string" }, "description": "argv, run without a shell. argv[0]: \"$bin\", one of detect.bin, or \"$dir/…\" (a file shipped in the plugin); any other program needs permissions.shell and the user's grant. \"$bin\" is replaced only as a whole element. Later elements may use {value} {delta} {index} {page} {param} {id.value} {settings.name}." },
+        { "type": "string", "description": "A zsh -lc command: needs permissions.shell and the user's grant. Values come only as env ($DECK_VALUE, $DECK_BIN, $DECK_SETTINGS_<NAME>…); $bin isn't replaced." }
+      ]
+    },
+    "transport": {
+      "type": "object",
+      "properties": {
+        "cmd": { "$ref": "#/$defs/cmd" },
+        "http": { "type": "string", "pattern": "^https?://", "description": "GET; loopback only unless declared in permissions.network and granted. Redirects aren't followed." },
+        "file": { "type": "string", "pattern": "^(/|~/|\\$dir/|\\{settings\\.\\w+\\})", "description": "A JSON (or text) file the tool rewrites (write a temp file, then rename). May start with a setting ({settings.status_file}). Missing: state stopped." },
+        "builtin": { "type": "string", "description": "Built-in plugins only." },
+        "interval": { "type": "number", "minimum": 1, "maximum": 3600, "description": "Seconds (defaults: cmd 30, http 10, file 2). Polled at most every 30 s while nothing on the current page shows the plugin." },
+        "timeout": { "type": "number", "minimum": 1, "maximum": 60, "description": "Seconds (default 10); the command's whole process group is killed." },
+        "stale": { "type": "number", "description": "Seconds without a fresh read / heartbeat before the status is stale (default max(95, 3 × interval)). A document with running: false is stopped instead." },
+        "parse": { "enum": ["auto", "json", "text"] }
+      },
+      "oneOf": [{ "required": ["cmd"] }, { "required": ["http"] }, { "required": ["file"] }, { "required": ["builtin"] }],
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 60 },
+        "params": { "type": "array", "items": { "type": "string" }, "description": "Args a key may pass ({ type: plugin, args: {…} }); usable as {name} in argv / urls, or merged into a builtin action. Arg strings are filled from this plugin's own vars ({id.value}, {id.settings.x}, {settings.x}) and the control's ({value}, {index}…), never another plugin's." },
+        "refresh": { "type": "boolean", "description": "Re-read the status right after (default true)." },
+        "cmd": { "$ref": "#/$defs/cmd" },
+        "timeout": { "type": "number", "minimum": 1, "maximum": 1800, "description": "Seconds: cmd actions up to 1800 (default 15; detached 1800), http actions up to 60 (default 10). The process group is killed after it." },
+        "detach": { "type": "boolean", "description": "cmd actions only: start in the background, report started at once (long builds). Output: ~/.deckstudio/plugins-logs/<id>-<action>.log." },
+        "toast": { "type": "boolean", "description": "Show the first line of output on the strip." },
+        "http": { "type": "string", "pattern": "^https?://" },
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "body": {},
+        "type": { "enum": ["app", "url"] },
+        "target": { "type": "string", "description": "app: \"bundle\" (the detected app) or a bundle id." },
+        "url": { "type": "string", "description": "https always; other schemes need permissions.schemes + the user's grant. Vars are URL-encoded; {name|path} keeps / between segments (no empty, . or .. segment)." },
+        "builtin": { "type": "object", "required": ["type"], "description": "Built-in plugins only: a DeckStudio action (capture → { type: capture, … })." }
+      },
+      "oneOf": [{ "required": ["cmd"] }, { "required": ["http"] }, { "required": ["url"] }, { "required": ["builtin"] }, { "required": ["type", "target"], "properties": { "type": { "const": "app" } } }],
+      "additionalProperties": false
+    },
+    "setting": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["string", "number", "boolean"], "description": "Default string." },
+        "default": { "type": ["string", "number", "boolean"], "description": "Must be of the setting's type." },
+        "title": { "type": "string", "maxLength": 60 },
+        "description": { "type": "string", "maxLength": 200 },
+        "secret": { "const": true, "description": "String settings only, no default: the value (an API token…) reaches only this plugin's own commands, urls and env; it is never a template var and never shown by /api/plugins or MCP." }
+      },
+      "additionalProperties": false
+    },
+    "templates": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+      "additionalProperties": {
+        "type": "object",
+        "description": "A key / dial / page object (docs/AGENT-GUIDE.md), or { title, what, template }."
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "note": "poltergeist status --json --config <project>/poltergeist.config.json: an object keyed by target name (plus _paused, _buildQueue). Targets here: app (t1), tests (t2).",
+  "values": {
+    "paused": "",
+    "t1_build": "building", "t1_failed": "", "t1_building": "building", "t1_progress": "35", "t1_daemon": "watching",
+    "t2_build": "failed", "t2_failed": "failed", "t2_building": "", "t2_error": "src/parser.test.ts: expected 3 tokens, got 2", "t2_daemon": "watching"
+  }
+}

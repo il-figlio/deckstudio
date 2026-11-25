@@ -1,0 +1,93 @@
+{
+  "deckstudio": "plugin/v1",
+  "id": "hello",
+  "name": "Hello",
+  "version": "0.1.0",
+  "author": "DeckStudio registry",
+  "description": "A minimal example plugin to copy: a bundled script prints a JSON status, values pick fields out of it, an argv action says hello on the strip.",
+  "icon": {
+    "glyph": "face--wink"
+  },
+  "status": {
+    "cmd": [
+      "$dir/hello-status"
+    ],
+    "interval": 10,
+    "timeout": 5
+  },
+  "values": {
+    "greeting": {
+      "path": "$.greeting",
+      "default": "…"
+    },
+    "minute": "$.minute",
+    "busy": {
+      "path": "$.busy",
+      "map": {
+        "true": "busy",
+        "false": ""
+      },
+      "stale": ""
+    }
+  },
+  "actions": {
+    "say": {
+      "title": "Say hello on the strip",
+      "cmd": [
+        "$dir/hello-say",
+        "{name}"
+      ],
+      "params": [
+        "name"
+      ],
+      "toast": true,
+      "timeout": 5
+    }
+  },
+  "templates": {
+    "keys": {
+      "hello": {
+        "title": "Hello key",
+        "what": "Shows the greeting and the minute; the lamp is lit on even minutes. Press says hello on the strip.",
+        "template": {
+          "glyph": "face--wink",
+          "label": "{self.greeting}",
+          "title": "min {self.minute}",
+          "led": "{self.busy}",
+          "onPress": {
+            "type": "plugin",
+            "action": "say",
+            "args": {
+              "name": "deck"
+            }
+          }
+        }
+      }
+    },
+    "dials": {
+      "minute": {
+        "title": "Minute dial",
+        "what": "Read-only readout of the status minute; press says hello.",
+        "template": {
+          "label": "Hello",
+          "glyph": "face--wink",
+          "style": "text",
+          "display": "{self.minute}",
+          "readonly": true,
+          "onPress": {
+            "type": "plugin",
+            "action": "say",
+            "args": {
+              "name": "dial"
+            }
+          }
+        }
+      }
+    }
+  },
+  "permissions": {
+    "shell": false,
+    "schemes": [],
+    "network": []
+  }
+}
