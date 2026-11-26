@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Open-source SDK and editor for the Elgato Stream Deck+ (keys, dials, touch strip) over direct HID. Not affiliated with Elgato or Corsair.",
   "license": "MIT",
-  "homepage": "https://decks-studio.vercel.app",
+  "homepage": "https://streamdeck-studio.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/il-figlio/deckstudio.git"

@@ -9,7 +9,7 @@
   <br><sub>The public browser demo (simulated Stream Deck+, sample data only). Regenerate with <code>npm run record:demo</code>.</sub>
 </p>
 
-**Try it in your browser, no device needed: <https://decks-studio.vercel.app>**
+**Try it in your browser, no device needed: <https://streamdeck-studio.vercel.app>**
 (the live demo with sample data; to host your own copy, see [docs/HOSTING.md](docs/HOSTING.md))
 
 <table>
